@@ -340,7 +340,8 @@ archive key); only future admission changes. Handled manually.
   any other. So only maintainers may create, move, or delete `v*` tags: an org-wide tag ruleset
   for `v*` (OpenCHAMI's plan supports org rulesets) is a prerequisite for adding a repo to
   `config/repos.yaml`. A tag-only `release` environment for the repo key secret is the
-  complement, so non-tag runs can't reach the key.
+  complement, so non-tag runs can't reach the key. A planned admit check (spec-deferred.md,
+  Release publisher check) backs this up for the archive.
 - The archive key (`ARCHIVE_GPG_KEY`) is available only to publish and prune.
 
 ## Phases

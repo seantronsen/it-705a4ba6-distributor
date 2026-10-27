@@ -5,6 +5,23 @@ Everything outside the prototype ([spec.md](spec.md)). Parked work lives on bran
 `seantronsen/wip/keepalive`, and `seantronsen/wip/tests`. All three predate review 1 and need
 reconciling with the reworked prototype.
 
+## Order
+
+1. Integration suite (Testing).
+2. Release publisher check.
+3. Gap: the same version in two releases of one batch isn't caught.
+4. Gap: `_publish.yml` hardcodes `poll-admit-*` (the keyring needs another input).
+5. Tentative: stop paging releases once discover reaches ones already in state.
+6. Keepalive workflow.
+7. S3 target, with prune checking the bucket against state (Hosting).
+8. Archive key management and the keyring package.
+9. Unit tests: rework `seantronsen/wip/tests`.
+10. Presentation.
+11. Trigger mechanism (cron fires only a few times a day).
+
+Deferred, possibly indefinitely: state on its own branch, apk and pacman, per-distro-version
+repositories, the notifier.
+
 ## Archive key management
 
 Parked on `seantronsen/wip/rekey-keyring`.
@@ -89,9 +106,20 @@ the apt `sources` entry, plus the compromise procedure. openchami.org's docs wil
 Parked on `seantronsen/wip/keepalive`. GitHub disables scheduled workflows in public repos after
 60 days without activity. State commits keep it active while releases flow; a monthly
 `keepalive` workflow commits a timestamp to `state/keepalive` when nothing else has been
-committed for 30 days.
+committed for 30 days. Keep the 30-day threshold a single variable so the integration suite can
+override it (e.g. with sed on the pushed copy) and test keepalive in minutes.
 
 ## Testing
+
+Two layers: the unit tests are a quick local sanity check of the scripts; the integration suite
+on real GitHub is the real insurance. Common to both:
+
+- Each generates its own throwaway key chain (root, repo, release, and archive keys); no test
+  touches a real key.
+- Client checks: install from the published repositories with `dnf` (Rocky/Fedora image,
+  `gpgcheck` and `repo_gpgcheck` on) and `apt` (Debian image, `signed-by` the archive key).
+
+### Unit tests
 
 Parked on `seantronsen/wip/tests`.
 
@@ -99,19 +127,62 @@ Parked on `seantronsen/wip/tests`.
   every rejection path, the name and version rules, ignored formats and architectures,
   already-admitted versions, retention (including `retain` and `keep-releases`), incremental
   metadata updates, and `deny` pruning.
-- Fixtures: generated releases (GoReleaser-built packages signed through a throwaway key chain)
-  for each rejection and retention case, plus real testbed releases. In tests, discover reads
-  releases from a fixtures directory instead of the GitHub API. End-to-end runs need a stable
-  (non-prerelease) testbed tag.
-- Client checks: install from the published directory with `dnf` (Rocky/Fedora image, `gpgcheck`
-  and `repo_gpgcheck` on) and `apt` (Debian image, `signed-by` the archive key).
-- The tests branch still relies on the old phased admit, the vendored `verify-chain.sh`, and the
+- Fixtures: generated releases (GoReleaser-built packages signed through the throwaway key chain)
+  for each rejection and retention case, plus real testbed releases. Discover reads releases
+  from a fixtures directory instead of the GitHub API.
+- The branch still relies on the old phased admit, the vendored `verify-chain.sh`, and the
   local-run tooling (`run-local.sh`, `in-tools.sh`); rework it against the new admit, which
   fetches the trust-chain script.
-- TODO at real deployment: an org fork, `OpenCHAMI/distributor-sandbox`, for end-to-end testing,
-  so it no longer runs in someone's personal repo and the real distributor ships nothing
-  test-only (sandbox config, test state, test secrets). It polls the github-actions testbed and
-  will likely work closely with it (testbed releases as its inputs, shared test tags and keys).
+
+### Integration suite
+
+Planned: an end-to-end suite on real GitHub that automates the cases in
+[testing-guide.md](testing-guide.md) (step 6, in section 7's order for `all`). This section only
+covers how the suite runs them. It's run by hand from bash scripts against throwaway personal
+repos (names are required config, never defaulted): a distributor, a testbed, and a second
+service repo for the cross-repo ownership rules. Everything in them is disposable: the suite
+force-pushes the local distributor and testbed checkouts' current commits over them, and creates
+every key on the fly.
+
+- `./run-integration-test <case>` or `all`. One file per case with setup, run, and check steps;
+  a case's setup builds what it needs (e.g. published releases) from a clean start, so a single
+  case can run alone.
+- Releases come two ways: `v*` tags through the testbed's real release pipeline (stable tags;
+  `-rc` tags are skipped by design), and crafted releases the suite builds itself (small rpms and
+  debs with any name or version, e.g. with nfpm, and `checksums.txt` signed by a release key it
+  certifies with the dummy repo key) for the cases the real pipeline can't produce. Many crafted
+  releases at once are slow because of GitHub's content-creation limits.
+- Reset, not delete (no `delete_repo` scope; `repo` and `workflow` are enough): force-push the
+  local commits; delete every release and tag, workflow run (and so artifacts), issue, and test
+  label; empty the test bucket; set the secrets again. Cleans up the same way when done, after
+  writing its report.
+- A guard runs first and refuses any repo that isn't clearly a test repo (e.g. a name suffix plus
+  a marker file the suite pushed itself); a typo must not force-push something real.
+- Secrets from the generated keys: `MASTER_PUBLIC_ASC` and `MASTER_FPR` on every repo,
+  `GPG_REPO_CERT_KEY_B64` and `GPG_REPO_KEY_B64` (a repo key per service repo) on the service
+  repos, `ARCHIVE_GPG_KEY` on the distributor. Short expiries; the temporary GnuPG home is kept
+  for inspecting failures.
+- S3: github.com runners can't reach a local MinIO, so the suite needs an internet-reachable test
+  bucket (a free-tier S3-compatible service, or a public MinIO with TLS) with credentials scoped
+  to that bucket only. TODO: find a free tier.
+- Optional config: a dummy GitHub account's token, the account added to the throwaway testbed as
+  a collaborator with only the write role. Used only to push a `v*` tag for the release
+  publisher check's rejection case (set as `GH_TOKEN` and a one-off git credential for that push
+  alone). Unset: that case reports `skip` and everything else still runs.
+- Waiting: every phase polls its condition (release published, run completed, state commit
+  present, issue open) with `gh api` every 15-30 seconds, up to a one-hour timeout; never a fixed
+  sleep. GitHub's status updates lag, so a check re-reads before failing. Checks find issues by
+  title, never by number (GitHub never reuses issue numbers).
+- Report: one line per case (`pass`, `fail`, `skip`, or `error` when GitHub itself timed out or
+  failed), with the run URLs and the first failed check's message, as plain text or TSV.
+- Plain bash with a small runner, not bats: live progress during hour-long phases and the
+  multi-way result matter here. Roughly 1,000-1,300 lines (launcher, helpers, crafted-release
+  builder, one file per case).
+- Not covered: the scheduler (unreliable on github.com).
+- TODO at real deployment: an org repo, `OpenCHAMI/distributor-sandbox`, for running the suite
+  so it no longer depends on personal repos and the real distributor ships nothing test-only
+  (sandbox config, test state, test secrets). It will likely work closely with the
+  github-actions testbed (testbed releases as its inputs, shared test tags and keys).
 
 ## Hosting
 
@@ -125,6 +196,31 @@ Parked on `seantronsen/wip/tests`.
   Safe because prune runs in the `poll` concurrency group, never alongside publish.
 - Exact polling interval.
 
+## Release publisher check
+
+A `v*` tag ruleset on every service repo (spec.md, Security) is easy to miss on one repo. Admit
+can enforce the rule for the archive itself, as a backstop (the ruleset is still what keeps the
+repo key from signing a non-maintainer's tag at all): find who pushed the tag that triggered the
+release (the release is created by the Actions bot, so take the actor of the release workflow
+run for that tag), and reject the release unless that person has maintain or admin permission
+on the service repo.
+
+- Use the run's actor (who pushed), not the commit author: a commit's author field is whatever
+  the committer typed.
+- Reading another repo's runs and collaborator permissions needs a token beyond this repo's
+  `GITHUB_TOKEN` (e.g. an org GitHub App with read access); decide alongside the trigger
+  mechanism, which needs one too.
+- Rejection reason names the actor and their permission; same issue flow as other rejections.
+
+## Presentation
+
+A LaTeX (beamer) slide deck with diagrams for the team, kept simple: what the design is, how a
+release flows through it, caveats (a retry is a new patch release; rejected releases are never
+reprocessed; the cron schedule is unreliable), security posture and open security questions, and
+the requirements on others: only core maintainers can change this repo at all (no PRs from
+anyone else), and `v*` tag pushes on every service repo are limited the same way (or enforced by
+the publisher check above). Then the testing-guide's presentation run as the demo.
+
 ## Later
 
 - apk and pacman. Both can update their indexes without old packages (tested): pacman natively
@@ -132,13 +228,18 @@ Parked on `seantronsen/wip/tests`.
   (`apk index --index` drops entries for absent packages), re-tarring, and signing with
   `abuild-sign`.
 - Per-distro-version repositories (per-EL rpms, per-Debian-release suites).
-- A notifier for newly published packages: email first, Slack later (Slack needs permission to
-  set up).
 - Repo name.
 - State on its own unprotected branch, so the poller bot needs no bypass on the protected default
   branch (a bypass can't be scoped to `state/state.json`). Unverified: whether commits to that
   branch count as activity for GitHub's 60-day scheduled-workflow rule.
-- Ignore releases published before a repo was added to `repos.yaml`. Today's releases of smd,
-  bss, magellan, ochami, opaal, tokensmith, and release carry unsigned packages with no sidecars,
-  so the first poll would reject each one and open an issue per release.
-- `releases_list` gets more expensive as releases accumulate (every poll lists every release).
+- Not planned: ignoring releases published before a repo was added to `repos.yaml`. Today's
+  releases of smd, bss, magellan, ochami, opaal, tokensmith, and release carry unsigned packages
+  with no sidecars; the first polls reject each one (256 per poll, oldest first) and open an
+  issue per release, until state covers them all. That's intended.
+- `releases_list` gets more expensive as releases accumulate (every poll lists every release);
+  see Order, item 5.
+
+## Possibly never
+
+- A notifier for newly published packages: email first, Slack later (Slack needs permission to
+  set up). GitHub issues already notify watchers, and delivery is hard to test.

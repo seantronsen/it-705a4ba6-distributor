@@ -1,13 +1,14 @@
 # Testing the prototype in the wild
 
 A manual sanity check: get one real, signed testbed release through poll and install its
-packages from the result. Unit tests come later.
+packages from the result. The cases in step 6 are also the list the planned integration suite
+automates ([spec-deferred.md](spec-deferred.md), Testing).
 
 Status 2026-10-27: on seantronsen/openchami-distributor-prototype, the first end-to-end run
 (40419147500, testbed v0.0.4) admitted, published, and installed with dnf and apt; every case in
-step 6 except 12 and 13 (local harness) passes; the testbed releases from those runs have since
-been deleted. GitHub's scheduler fires the `*/10` poll only a few times a day (2 overnight), so
-dispatch poll by hand rather than waiting for it.
+step 6 except 12 and 13 (they need crafted releases) passes; the testbed releases from those
+runs have since been deleted. GitHub's scheduler fires the `*/10` poll only a few times a day
+(2 overnight), so dispatch poll by hand rather than waiting for it.
 
 ## 0. Before you start
 
@@ -17,9 +18,9 @@ dispatch poll by hand rather than waiting for it.
 
 ## 1. A repo to run in
 
-Use a personal sandbox repo (e.g. `seantronsen/openchami-distributor-prototype`). The org's `main` ruleset
-(PRs and signed commits required) would block the bot's state commits, and a personal repo also
-gets schedules and `workflow_dispatch` without merging anything.
+Use a personal sandbox repo (e.g. `seantronsen/openchami-distributor-prototype`). The org's
+`main` ruleset (PRs and signed commits required) would block the bot's state commits, and a
+personal repo also gets schedules and `workflow_dispatch` without merging anything.
 
 ```bash
 gh repo create seantronsen/openchami-distributor-prototype --public
@@ -121,9 +122,10 @@ Each case is one of two kinds:
   the reusable-workflow wiring, artifacts between jobs, concurrency, `GITHUB_TOKEN` permissions,
   real commits and issues). Always a human, by hand. Rerun every GitHub case after any change to
   `.github/workflows/`; after a script-only change, case 2 is enough.
-- **Local**: tests script logic only. A local harness (fake GitHub API, generated releases; see
-  `seantronsen/wip/tests` in spec-deferred.md) can run these without GitHub. It isn't built yet,
-  so for now they're manual too, on the sandbox.
+- **Local**: tests script logic only, so the unit tests (spec-deferred.md, Testing) can cover
+  them without GitHub. They aren't built yet, so for now these are manual too, on the sandbox.
+
+The planned integration suite will run every case, both kinds, against throwaway repos.
 
 After each case, check the run, `state/state.json` on the sandbox's `main`, and the sandbox's
 issues. Dispatch poll after each setup step (`gh workflow run poll.yml -R <sandbox>`).
@@ -205,10 +207,10 @@ Making releases on the testbed:
     `<name>-*` and not in `allow`; are in another repo's `allow`; match a longer repo name; were
     first published by another repo; have a non-`major.minor.patch` version (rejected) or a
     prerelease version in a non-prerelease release (skipped); duplicate a package within the
-    release. Expect each rejected or skipped with its reason. Needs a second service repo, so
-    it's only practical in the local harness.
+    release. Expect each rejected or skipped with its reason. Needs a second service repo and
+    crafted releases (the integration suite or the local harness).
 13. **256-release cap.** More than 256 new releases at once. Expect the oldest 256 admitted and
-    the rest on later polls. Local harness only.
+    the rest on later polls. Needs crafted releases, as 12.
 14. **Overlapping runs.** Dispatch poll twice in quick succession while a release is waiting.
     Expect the second run to wait for the first (concurrency group `poll`), then find nothing
     new; state stays consistent.
@@ -223,6 +225,7 @@ Clean slate: no testbed releases or `v*` tags, sandbox `state/state.json` = `{}`
 issues, no `deny` in `config/repos.yaml`, `ARCHIVE_GPG_KEY` = the test key. Every `v*` tag goes
 on the testbed PR branch in this order (each is the highest on its commit); dispatch poll after
 each step unless it says otherwise, and record the run URL, state commit, and issues per step.
+Delete each `test-*` release right after its step's poll (see step 6, Making releases).
 
 | Step | Do | Case | Expect |
 |---|---|---|---|
@@ -244,15 +247,21 @@ each step unless it says otherwise, and record the run URL, state commit, and is
 
 Expected issues at the end, in order: three `Rejected release` (steps 3-3b), `Denied repo key`
 (step 6), `Prune failing` (closed, step 7a), `Denied repo key` (step 7b), `Rejected release`
-(step 8). Cases 12 and 13 need the local harness and aren't part of this run.
+(step 8). Cases 12 and 13 need crafted releases and aren't part of this run.
 
 ## Cleanup
 
-Delete every testbed release and tag the run made, then either delete the sandbox or reset it
-for the next run (state to `{}`, issues closed, no `deny`, the test `ARCHIVE_GPG_KEY`).
+Delete every testbed release and tag the run made. Then reset the sandbox for the next run:
+push `state/state.json` = `{}` and a `config/repos.yaml` without `deny`; delete its issues,
+workflow runs (which removes their artifacts), and the labels the runs created; keep the
+secrets, with `ARCHIVE_GPG_KEY` back on the test key. Or delete the sandbox.
 
 ```bash
-T=OpenCHAMI/github-actions-testbed
+T=OpenCHAMI/github-actions-testbed S=seantronsen/openchami-distributor-prototype
 for t in $(gh release list -R $T -L 100 | cut -f3); do gh release delete "$t" -R $T --cleanup-tag --yes; done
-gh repo delete seantronsen/openchami-distributor-prototype --yes
+for n in $(gh issue list -R $S --state all -L 100 --json number -q '.[].number'); do gh issue delete "$n" -R $S --yes; done
+for id in $(gh api --paginate "repos/$S/actions/runs?per_page=100" -q '.workflow_runs[].id'); do
+  gh api -X DELETE "repos/$S/actions/runs/$id"
+done
+for l in rejected-release denied-repo-key prune-failing; do gh label delete "$l" -R $S --yes; done
 ```
