@@ -179,6 +179,11 @@ every key on the fly.
   multi-way result matter here. Roughly 1,000-1,300 lines (launcher, helpers, crafted-release
   builder, one file per case).
 - Not covered: the scheduler (unreliable on github.com).
+- TODO (later; Sean reviews it before anything runs it): a script that creates the throwaway
+  repos with `gh` under the user's account (public, empty, a random base name with the suffixes
+  the suite needs, e.g. `<rand>-distributor`, `<rand>-testbed`, `<rand>-testbed-tools`) and
+  records the names in a gitignored local file the suite reads, and a cleanup script that deletes
+  exactly the repos named in that file, instead of creating and deleting them by hand.
 - TODO at real deployment: an org repo, `OpenCHAMI/distributor-sandbox`, for running the suite
   so it no longer depends on personal repos and the real distributor ships nothing test-only
   (sandbox config, test state, test secrets). It will likely work closely with the
