@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Deletes the throwaway repos recorded in repos.env by init-integration-repos, their GHCR images
+# when the token can, and then repos.env.
+#
+#   tests/integration/destroy-integration-repos [--yes]
+#
+# Deleting repos needs the delete_repo scope (gh auth refresh -s delete_repo), and the images
+# need delete:packages; without them it lists what to delete by hand. Asks before deleting
+# unless --yes.
+set -euo pipefail
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+REPOS_FILE=${IT_REPOS:-$HERE/repos.env}
+MARKER=.distributor-it
+
+log() { printf '%s\n' "$*" >&2; }
+die() { printf 'error: %s\n' "$*" >&2; exit 2; }
+
+yes=false
+case ${1:-} in
+  "") ;;
+  --yes) yes=true ;;
+  *) die "usage: destroy-integration-repos [--yes]" ;;
+esac
+
+[[ -f $REPOS_FILE ]] || die "$REPOS_FILE not found: nothing to destroy"
+command -v gh > /dev/null || die "needs gh, logged in (gh auth login)"
+owner=$(gh api user -q .login) || die "gh isn't logged in (gh auth login)"
+# shellcheck source=/dev/null
+source "$REPOS_FILE"
+
+# Only what init created: under this account, not OpenCHAMI, named <base>-*, and either empty or
+# carrying the marker a run pushed. Repos that no longer exist are skipped.
+repos=()
+for repo in "${IT_DISTRIBUTOR_REPO:?}" "${IT_TESTBED_REPO:?}" "${IT_SERVICE2_REPO:?}"; do
+  [[ ${repo%%/*} == "$owner" ]] || die "$repo: not under your account ($owner)"
+  [[ ${owner,,} != openchami ]] || die "$repo: refusing a repo under OpenCHAMI"
+  [[ ${repo#*/} =~ ^it-[0-9a-f]+-(distributor|testbed|testbed-tools)$ ]] \
+    || die "$repo: not a name init-integration-repos creates"
+  if ! gh api "repos/$repo" > /dev/null 2>&1; then
+    log "$repo: doesn't exist, skipping"
+    continue
+  fi
+  if gh api "repos/$repo/commits?per_page=1" > /dev/null 2>&1; then
+    gh api "repos/$repo/contents/$MARKER" > /dev/null 2>&1 \
+      || die "$repo: has history but no $MARKER; refusing to delete it"
+  fi
+  repos+=("$repo")
+done
+
+# The testbed's images, named after it (see the suite's seed step).
+testbed=${IT_TESTBED_REPO#*/}
+images=()
+for image in "$testbed" "$testbed-alt"; do
+  if gh api "user/packages/container/$image" > /dev/null 2>&1; then images+=("$image"); fi
+done
+
+scopes=$(gh api -i user 2> /dev/null | tr -d '\r' | sed -n 's/^[Xx]-[Oo][Aa]uth-[Ss]copes: //p')
+scopes=,${scopes// /},
+
+log "to delete:"
+for repo in "${repos[@]}"; do log "  repo  $repo"; done
+for image in "${images[@]}"; do log "  image ghcr.io/${owner,,}/$image"; done
+if ! $yes; then
+  read -r -p "delete these? [y/N] " answer
+  [[ $answer == [yY] ]] || die "nothing deleted"
+fi
+
+failed=false
+if ((${#repos[@]})); then
+  if [[ $scopes == *,delete_repo,* ]]; then
+    for repo in "${repos[@]}"; do
+      if gh repo delete "$repo" --yes; then log "deleted $repo"; else failed=true; fi
+    done
+  else
+    log "the token lacks delete_repo: run gh auth refresh -s delete_repo, or delete by hand"
+    failed=true
+  fi
+fi
+if ((${#images[@]})); then
+  if [[ $scopes == *,delete:packages,* ]]; then
+    for image in "${images[@]}"; do
+      if gh api -X DELETE "user/packages/container/$image" > /dev/null; then
+        log "deleted ghcr.io/${owner,,}/$image"
+      else
+        failed=true
+      fi
+    done
+  else
+    log "the token lacks delete:packages: run gh auth refresh -s delete:packages," \
+      "or delete by hand"
+    failed=true
+  fi
+fi
+
+# Kept until everything is gone, so a rerun picks up where this one stopped.
+$failed && die "not everything was deleted; $REPOS_FILE kept"
+rm -f "$REPOS_FILE"
+log "removed $REPOS_FILE"
