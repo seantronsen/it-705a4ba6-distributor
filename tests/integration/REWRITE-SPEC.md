@@ -179,8 +179,67 @@ Last run: ~68 min. Release builds 26 min (6 builds), polls 25 min (23), poll sta
 - client_checks: it isn't a downloader; it ran the dnf and apt install checks against case 11's
   downloaded repositories. The split design is the architecture failure in section 1.
 
+## 10. Split: ci/ and distro/ (decided 2026-10-29, not implemented)
+
+Why: the install checks ran in sibling containers through the host engine's socket, so the
+ci tools container could start containers. S3 and the keyring package will need more
+distro-level testing, so it gets its own place with the risk contained there.
+
+Layout:
+
+```
+tests/integration/
+  lib/      shared: log.sh, config.sh, engine.sh
+  ci/       the CI integration tests (today's suite)
+  distro/   distro-level tests of the published repositories
+```
+
+ci/:
+
+- No engine socket, ever. One socket-less tools container per run; no podman-remote or
+  docker-cli; lib/install.sh gone.
+- One more bind mount: <output_dir>/<run id>/artifacts on the host. A test that produces
+  something for distro/ writes it to artifacts/<test name>/.
+- install-real-build becomes real-build: real release, admitted, 6 packages published, then
+  the published targets copied to artifacts/real-build/{rpm,deb} (repo plus keys/archive.asc).
+
+distro/:
+
+- bats, phased per file: setup_file is stage 1 (runs the ci stage, e.g. ci real-build, to
+  produce the artifacts, and sets up the source); each @test is one target (fedora:42 with dnf,
+  debian:13 with apt) installing natively from the source; teardown_file removes what
+  setup_file made. bats has no parametrized tests: one short @test per target.
+- Sources:
+  1. the artifact files directly (file://, mounted read-only);
+  2. a temporary local versitygw (posix backend on a temp dir, public-read bucket, deleted in
+     teardown_file): the artifacts are copied into <tmpdir>/<bucket>/ and the targets fetch
+     over HTTP on a shared podman network, the same URL shape as real S3. Public reads on
+     versitygw are confirmed by Sean.
+  The distributor's own S3 upload can't reach a local versitygw from GitHub Actions; that
+  test waits for a reachable test bucket.
+- The engine socket is allowed here only, and only for now: it limits the blast surface to
+  the distro tests and buys time to think about alternatives. distro requires podman
+  (rootless; the socket is the user's own service) and refuses docker (root-equivalent).
+- The key comes from the source (keys/archive.asc) until the keyring package exists; then the
+  test installs the keyring package first, the way users will.
+- Later: quadlet start under systemd (rootless --systemd=always) before considering a VM.
+
+Docs (docs/integration-tests.md):
+
+- distro: a prominent warning: a container starts containers as the user through their
+  rootless podman socket, what that implies, and to review the distro test code before
+  running it.
+- ci: single socket-less container; safe to run without that level of scrutiny.
+
 ## Next round
 
+- The split above (section 10).
+- debian:13 for the ci tools container (Debian by default unless there's a really good reason).
+- --init on engine__run, so PID 1 in a container handles Ctrl-C (the tools container ignored it
+  during the install, before its trap was set).
+- Doc-comment banners: 80 # characters (162 lines are 39 now).
+- Last step of the revision: drop unused sources (lib/engine.sh sources log.sh for nothing).
+- run.sh --help: open (Sean isn't sure about printing the header via sed; at least to stdout).
 - Rename log__die to log__fatal (systems convention: fatal = log, then exit). Same for the
   distributor's own scripts: scripts/lib.sh defines die() and the workflow scripts call it; rename
   it to the matching fatal form there too (not done yet; it touches the shipped scripts).
