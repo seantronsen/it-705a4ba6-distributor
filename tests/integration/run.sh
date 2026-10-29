@@ -64,9 +64,6 @@ prepare_environment() {
   if [[ -n $scopes && ,${scopes// /}, != *,repo,* ]]; then
     log__die "the gh token needs the repo scope (gh auth refresh -s repo)"
   fi
-  if [[ -n $scopes && ,${scopes// /}, != *,workflow,* ]]; then
-    log__die "the gh token needs the workflow scope (gh auth refresh -s workflow)"
-  fi
 
   [[ -S ${SSH_AUTH_SOCK:-} ]] ||
     log__die "git pushes over SSH: start an ssh-agent holding a key GitHub accepts"

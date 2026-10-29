@@ -13,7 +13,8 @@ The throwaway repos are overwritten completely on every run. Use repos made for 
   git, gpg, rpm and deb tools are installed there); the install checks run in clean sibling
   containers through the host engine's socket. Nothing is installed on the host.
 - `yq` on the host (either implementation), for the config.
-- `gh`, logged in, with the `repo` and `workflow` scopes (`gh auth refresh -s repo,workflow`).
+- `gh`, logged in, with the `repo` scope (`gh auth refresh -s repo`). No `workflow` scope: git
+  pushes go over SSH, where token scopes don't apply.
   The token reaches the container on stdin only: never a file, the container's environment, or
   a command line.
 - An SSH agent (`SSH_AUTH_SOCK`) holding a key GitHub accepts: git pushes over SSH through it.
