@@ -1,8 +1,32 @@
 # Integration suite rewrite: spec
 
-Status: agreed direction from Sean's review (2026-10-28) plus the earlier revision items. Nothing
-implemented. Supersedes PLAN-faster-suite.md and the revision list in REPORT-2026-10-28.md.
-Items marked OPEN need Sean's call before or during implementation.
+Status: implemented 2026-10-28, not yet run on GitHub (run.sh, init.sh, destroy.sh untested
+remotely). Supersedes the revision list in REPORT-2026-10-28.md.
+
+## Implementation notes (decisions taken, deviations)
+
+- OPEN items, as implemented:
+  - Install containers: sibling containers through the host engine's socket. run.sh starts a
+    private `podman system service` on a socket in the run directory (docker: its own socket);
+    the tools container uses podman-remote or docker-cli. The shared run directory is mounted
+    at the same path in the tools container, so sibling mounts resolve. Verified locally.
+  - Failing in tests: bats' default (a failing command fails the test). Checks retry 3 times
+    10 s apart (wait__check) before failing.
+  - Config file: config.yaml, with config.example.yaml committed. init.sh writes repos.yaml.
+  - Ctrl-C: verified locally. It stops the running test at once, then the test's teardown and
+    teardown_suite run. Needed: run-in-container.sh runs bats with SIGINT's default handling
+    restored and forwards the signal to its process group; run.sh and tee wait instead of quitting.
+- Deviation: keys, secrets, and the force-push of the checkouts happen once per run in
+  setup_suite, not in init.sh. The code under test changes between runs and the keys are
+  throwaway, so they can't be made once at init. init/destroy only create and delete repos.
+- Deviation: the log helpers follow the module__function rule too: log__info, log__error
+  (logs, returns 1), log__die (logs, exits; scripts only).
+- Dropped: the dummy-token setting (the publisher check will be buddy style or an App), and
+  the docker chown (run.sh's cleanup already removes root-owned leftovers with a container).
+- Size: ~1,240 code lines (not counting comments and blank lines), not the ~800 estimated. The
+  difference is the conventions (include guards and source lines in every file, explicit
+  `|| return 1` handling without set -e), config files written out as YAML heredocs in the tests,
+  rpm crafting, the engine socket and interrupt handling, and the new admit-new-release test.
 
 ## 1. Architecture
 
@@ -18,7 +42,7 @@ Items marked OPEN need Sean's call before or during implementation.
   - setup / teardown (per test): every test starts from a clean baseline and cleans up after
     itself. No test relies on state another test left (today `all` reuses releases across
     cases: removed). Baseline = empty distributor state, default config, no releases/tags/
-    issues/labels on the service repos, no active runs.
+    issues/labels on the service repos, no poll running.
   - Baseline cost: a config change triggers a poll (poll.yml runs on config pushes), so setup
     rewrites config only when it differs from the default, and resets state otherwise.
 - Clean install containers (dnf on Fedora, apt on Debian) without nesting. OPEN; recommended:
@@ -154,3 +178,9 @@ Last run: ~68 min. Release builds 26 min (6 builds), polls 25 min (23), poll sta
   failing counts as error. Gone with bats (any failing test exits non-zero).
 - client_checks: it isn't a downloader; it ran the dnf and apt install checks against case 11's
   downloaded repositories. The split design is the architecture failure in section 1.
+
+## Next round
+
+- Rename log__die to log__fatal (systems convention: fatal = log, then exit). Same for the
+  distributor's own scripts: scripts/lib.sh defines die() and the workflow scripts call it; rename
+  it to the matching fatal form there too (not done yet; it touches the shipped scripts).

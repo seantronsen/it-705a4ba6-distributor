@@ -1,0 +1,33 @@
+# Integration suite settings. Copy to config.yaml (gitignored), or point IT_CONFIG at another
+# file. Secrets never go here: the GitHub token comes from gh, git uses your SSH agent.
+
+# Local checkouts whose HEAD commits get tested (force-pushed to the throwaway repos). Tracked
+# files must be committed.
+checkouts:
+  distributor: ~/projects/openchami/distributor
+  testbed: ~/projects/openchami/github-actions-testbed
+
+# The throwaway repos. Normally left out: init.sh creates them and records them in repos.yaml,
+# which wins. Set them only for repos made by hand. The second service repo's name should start
+# with the testbed's plus "-" (package-rules' longer-name check needs it).
+#repos:
+#  distributor: you/it-0123abcd-distributor
+#  testbed: you/it-0123abcd-testbed
+#  service2: you/it-0123abcd-testbed-tools
+
+images:
+  tools: docker.io/library/fedora:42
+  debian: docker.io/library/debian:13
+
+# podman or docker; empty picks podman when installed.
+engine: ""
+
+# Where run reports go (one directory per run).
+output_dir: /tmp/distributor-it
+
+# Seconds any single wait may take, and between checks while waiting.
+timeout: 3600
+poll_interval: 10
+
+# true leaves the repos as the run left them (no end-of-run cleanup), for inspection.
+keep: false
