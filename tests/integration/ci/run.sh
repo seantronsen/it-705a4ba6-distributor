@@ -9,6 +9,8 @@
 # GitHub token reaches it on stdin only; git pushes over SSH through your agent. Logs go to
 # stderr; the results (TAP) go to stdout and to <output_dir>/<run id>/report.tap. Files tests
 # export (real-build's published repositories) go to <output_dir>/<run id>/artifacts.
+#
+# Settings: config.defaults.yaml, overridden by ~/.config/distributor-it/config.yaml.
 set -uo pipefail
 
 # shellcheck source=../lib/launch.sh

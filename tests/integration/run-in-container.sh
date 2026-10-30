@@ -5,53 +5,38 @@
 #   run-in-container.sh <suite> [test name... | bats option...]
 #
 # stdin: the GitHub token (one line), so it's never in a file, the engine's record of the
-# container's environment, or a command line.
+# container's environment, or a command line. The settings are in /run/distributor-it.
 set -uo pipefail
 
 # shellcheck source=lib/log.sh
 source /suite/lib/log.sh
-
-################################################################################
-# Installs the suites' tools with apt, plus the engine client when the container has the host
-# engine's socket.
-# Globals:
-#   IT_ENGINE (podman-remote when the container has the socket)
-################################################################################
-install_tools() {
-  local packages=(bats ca-certificates gh git gnupg jq openssh-client rpm)
-  if [[ ${IT_ENGINE:-} == podman-remote ]]; then packages+=(podman-remote); fi
-  if ! { apt-get update -qq && apt-get install -y -qq --no-install-recommends "${packages[@]}"; } \
-    > /dev/null 2>&1; then
-    log__fatal "apt couldn't install the tools"
-  fi
-}
-
-################################################################################
-# GitHub access for git (gh already has GH_TOKEN): over SSH through the host's agent, with
-# github.com's host keys taken from GitHub's API (over TLS) instead of trusted on first use.
-################################################################################
-setup_github_access() {
-  install -d -m 700 ~/.ssh
-  if ! gh api meta -q '.ssh_keys[] | "github.com " + .' > ~/.ssh/known_hosts; then
-    log__fatal "can't fetch github.com's SSH host keys"
-  fi
-  # No .gitconfig: the checkout copies may belong to another user, and detached HEADs are fine.
-  export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes -o BatchMode=yes"
-  export GIT_CONFIG_COUNT=2
-  export GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
-  export GIT_CONFIG_KEY_1=advice.detachedHead GIT_CONFIG_VALUE_1=false
-}
+# shellcheck source=lib/settings.sh
+source /suite/lib/settings.sh
+# shellcheck source=lib/container.sh
+source /suite/lib/container.sh
 
 main() {
-  local suite=${1:-} cases files=() options=() status bats_pid
+  local suite=${1:-} cases files=() options=() status bats_pid failed=false
   cases=/suite/$suite/cases
-  [[ -n $suite && -d $cases ]] || log__fatal "no suite '$suite'"
+  if [[ -z $suite || ! -d $cases ]]; then
+    log__error "no suite '$suite'"
+    failed=true
+  fi
   shift
   IFS= read -r GH_TOKEN || true
-  [[ -n $GH_TOKEN ]] || log__fatal "no GitHub token on stdin"
+  if [[ -z $GH_TOKEN ]]; then
+    log__error "no GitHub token on stdin"
+    failed=true
+  fi
+  $failed && exit 1
   export GH_TOKEN
-  install_tools
-  setup_github_access
+  container__install_tools || exit 1
+  container__setup_github_access || exit 1
+  # The engine command for lib/engine.sh, when the run has one (distro: podman-remote).
+  if settings__has .run.engine; then
+    IT_ENGINE=$(settings__get .run.engine) || exit 1
+    export IT_ENGINE
+  fi
   while (($#)); do
     case $1 in
       -f | --filter | --filter-tags | --filter-status)

@@ -16,31 +16,34 @@ source "$(dirname "${BASH_SOURCE[0]}")/testbed.sh"
 ################################################################################
 # Refuses anything that isn't clearly one of the suite's repos: public (the distributor reads
 # the service repos without their tokens), not a fork, and either empty or carrying the marker.
+# Reports every problem with every repo.
 # Returns:
 #   0 when all three repos pass, 1 otherwise.
 ################################################################################
 lifecycle__guard() {
-  local repo info
+  local repo info failed=false
   for repo in "$(suite__distributor_repo)" "$(suite__testbed_repo)" "$(suite__service2_repo)"; do
     if ! info=$(gh api "repos/$repo"); then
       log__error "$repo: not found"
-      return 1
+      failed=true
+      continue
     fi
     if [[ $(jq -r .visibility <<< "$info") != public ]]; then
       log__error "$repo: not public"
-      return 1
+      failed=true
     fi
     if [[ $(jq -r .fork <<< "$info") != false ]]; then
       log__error "$repo: a fork"
-      return 1
+      failed=true
     fi
     # An empty repo has no commits yet; anything else must carry the marker.
     if gh api "repos/$repo/commits?per_page=1" > /dev/null 2>&1 &&
       ! gh api "repos/$repo/contents/$(suite__marker)" > /dev/null 2>&1; then
       log__error "$repo: has history but no $(suite__marker); refusing to overwrite it"
-      return 1
+      failed=true
     fi
   done
+  ! $failed
 }
 
 ################################################################################
@@ -89,15 +92,13 @@ lifecycle__reset() {
 
 ################################################################################
 # Cleans the repos after a run: everything wiped (runs too) and the secrets deleted. Skipped
-# when IT_KEEP is set, to inspect what the run left.
-# Globals:
-#   IT_KEEP
+# when keep is set, to inspect what the run left.
 # Returns:
 #   0, or 1 when cleaning failed.
 ################################################################################
 lifecycle__teardown_suite() {
   local repo failed=false
-  if [[ ${IT_KEEP:-false} == true ]]; then
+  if suite__keep; then
     log__info "keep is set: leaving the repos as the run left them"
     return 0
   fi

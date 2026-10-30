@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deletes the throwaway repos init.sh recorded in the state file, after you confirm their names,
 # and the testbed's images in your GHCR namespace; then deletes the state file. Repos set in
-# config.yaml are never touched.
+# your config are never touched.
 #
 # Needs the delete_repo scope, and delete:packages for the images:
 #   gh auth refresh -s delete_repo,delete:packages
@@ -15,23 +15,32 @@ source "$(dirname "$0")/lib/config.sh"
 main() {
   local file owner role repo repos=() image images=() answer failed=false
   file=$(config__state_file)
-  [[ -f $file ]] || log__fatal "$file not found: init.sh created no repos to destroy"
-  owner=$(gh api user -q .login) || log__fatal "gh isn't logged in (gh auth login)"
+  if [[ ! -f $file ]]; then
+    log__error "$file not found: init.sh created no repos to destroy"
+    failed=true
+  fi
+  if ! owner=$(gh api user -q .login); then
+    log__error "gh isn't logged in (gh auth login)"
+    failed=true
+  fi
+  $failed && exit 1
 
-  # Only what init.sh creates: under this account and named like it.
+  # Only what init.sh creates: under this account and named like it. Every repo is checked
+  # before anything is refused.
   for role in distributor testbed service2; do
-    repo=$(config__read "$file" ".$role") || exit 1
+    repo=$(config__state ".$role") || exit 1
     if [[ ! $repo =~ ^$owner/it-[0-9a-f]{8}-(distributor|testbed|testbed-tools)$ ]]; then
-      log__fatal "refusing to delete $repo: init.sh only creates" \
+      log__error "refusing to delete '$repo': init.sh only creates" \
         "$owner/it-<8 hex digits>-{distributor,testbed,testbed-tools}"
-    fi
-    if gh api "repos/$repo" > /dev/null 2>&1; then
+      failed=true
+    elif gh api "repos/$repo" > /dev/null 2>&1; then
       repos+=("$repo")
     else
       log__error "$repo doesn't exist; skipping it"
     fi
   done
-  repo=$(config__read "$file" .testbed) || exit 1
+  $failed && log__fatal "nothing deleted: $file lists repos init.sh doesn't create"
+  repo=$(config__state .testbed) || exit 1
   for image in "${repo#*/}" "${repo#*/}-alt"; do
     if gh api "user/packages/container/$image" > /dev/null 2>&1; then images+=("$image"); fi
   done

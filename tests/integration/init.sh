@@ -7,41 +7,38 @@
 #   it-<random>-testbed         the testbed
 #   it-<random>-testbed-tools   the second service repo (its name starts with the testbed's)
 #
-# They're public and empty; the runs fill them. Delete them with destroy.sh. Refused when
-# config.yaml sets repos (the tests use those) or the state file already exists.
+# They're public and empty; the runs fill them. Delete them with destroy.sh. Refused when your
+# config sets repos (the tests use those) or the state file already exists.
 set -uo pipefail
 
 # shellcheck source=lib/log.sh
 source "$(dirname "$0")/lib/log.sh"
 # shellcheck source=lib/config.sh
 source "$(dirname "$0")/lib/config.sh"
-
-################################################################################
-# Random lowercase hex characters.
-# Arguments:
-#   How many.
-# Outputs:
-#   The characters on stdout.
-################################################################################
-rand_chars() {
-  head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c "1-$1"
-}
+# shellcheck source=lib/random.sh
+source "$(dirname "$0")/lib/random.sh"
 
 main() {
-  local file owner base try name taken
+  local file owner base try name taken failed=false
   file=$(config__state_file)
-  if [[ -f $(config__file) && -n $(config__read "$(config__file)" .repos) ]]; then
-    log__fatal "$(config__file) sets repos, so the tests use those; remove them to create new ones"
+  if config__has .repos; then
+    log__error "$(config__file) sets repos, so the tests use those; remove them to create new ones"
+    failed=true
   fi
   if [[ -e $file ]]; then
-    log__fatal "already initialized: $file lists repos. destroy.sh deletes them, whether they" \
+    log__error "already initialized: $file lists repos. destroy.sh deletes them, whether they" \
       "still exist or not; to keep them and create new ones, move $file aside first"
+    failed=true
   fi
-  owner=$(gh api user -q .login) || log__fatal "gh isn't logged in (gh auth login)"
+  if ! owner=$(gh api user -q .login); then
+    log__error "gh isn't logged in (gh auth login)"
+    failed=true
+  fi
+  $failed && exit 1
 
   # A taken name is practically impossible; pick a new one a few times anyway.
   for try in {1..3}; do
-    base=it-$(rand_chars 8)
+    base=it-$(random__hex 8)
     taken=false
     for name in "$base-distributor" "$base-testbed" "$base-testbed-tools"; do
       if gh api "repos/$owner/$name" > /dev/null 2>&1; then taken=true; fi

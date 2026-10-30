@@ -33,14 +33,15 @@ without that level of review.
 - podman (rootless) or docker; the distro tests need rootless podman. Everything runs in a
   transient `debian:13` tools container (bats, gh, git, gpg, rpm and deb tools are installed
   there). Nothing is installed on the host.
-- `yq` on the host (either implementation), for the config.
+- `yq` (either implementation) and `jq` on the host, for the configuration.
 - `gh`, logged in, with the `repo` scope (`gh auth refresh -s repo`). The token reaches the
   container on stdin only: never a file, the container's environment, or a command line.
 - An SSH agent (`SSH_AUTH_SOCK`) holding a key GitHub accepts (`ssh-add -l` lists it): git
   pushes over SSH through it. A key ssh finds on disk isn't enough; the container only sees the
   agent.
-- Local checkouts of the distributor and the testbed (git worktrees work) with no uncommitted
-  changes to tracked files. Their HEAD commits are what get tested.
+- The code under test: by default this checkout's HEAD commit (no uncommitted changes to tracked
+  files; git worktrees work) and the testbed's latest release, fetched from GitHub. Either can
+  be a local checkout or a GitHub repo at any ref (Configuration).
 
 ## Repos
 
@@ -53,24 +54,44 @@ tests/integration/destroy.sh   # delete them, when done
 `it-<random>-testbed-tools` (public, empty) under your account and records them in its state
 file, `~/.local/state/distributor-it/repos.yaml` (`IT_STATE` overrides), outside the source
 tree. Every run reuses them until you destroy them. It refuses when the state file exists (to
-keep those repos and make new ones, move the file aside) or when `config.yaml` sets repos.
+keep those repos and make new ones, move the file aside) or when your config sets repos.
 
 `destroy.sh` deletes exactly the repos in the state file, after checking each is yours and
 named like init's, and only after you type `Y` having seen their names. Repos already gone are
 reported and skipped. It also deletes the testbed's images in your GHCR namespace, then the
 state file. It needs the `delete_repo` scope, and `delete:packages` for the images
-(`gh auth refresh -s delete_repo,delete:packages`). It never touches repos set in `config.yaml`.
+(`gh auth refresh -s delete_repo,delete:packages`). It never touches repos set in your config.
 
-Repos made by hand work too: set `repos` in `config.yaml`, which then wins over the state file.
+Repos made by hand work too: set `repos` in your config, which then wins over the state file.
 package-rules' longer-repo-name check runs only when the second service repo's name starts with
 the testbed's name plus `-`.
 
 ## Configuration
 
-Copy `tests/integration/config.example.yaml` to `tests/integration/config.yaml` (gitignored;
-`IT_CONFIG` overrides the path). Nothing writes to it. It holds every setting that isn't a
-secret: the checkouts, the repos (when not made by init.sh), the images, the engine, the output
-directory, timeouts, and `keep` (skip the end-of-run cleanup to inspect what a run left).
+`tests/integration/config.defaults.yaml` holds every setting with its default and what it
+means: the code under test (`checkouts`), the repos (when not made by init.sh), the images, the
+engine, the output directory, timeouts, `keep` (skip the end-of-run cleanup of the repos, to
+inspect what a run left), and the S3 gateway's. Don't edit it.
+
+Your settings go in `~/.config/distributor-it/config.yaml` (`$XDG_CONFIG_HOME` is respected;
+`IT_CONFIG` picks another file), with only the keys you change; each overrides its default.
+Nothing writes to it, and it's optional. For example, to test a local testbed checkout:
+
+```yaml
+checkouts:
+  testbed:
+    path: ~/projects/openchami/github-actions-testbed
+```
+
+A checkout is either `path` (a local checkout's HEAD commit; relative paths start at this repo's
+root) or `repo` (owner/name on GitHub) with an optional `ref` (commit, tag, or branch; without
+it, the latest release). Setting one replaces the whole default entry.
+
+Before anything runs, the run scripts check the host, the settings they read, the repos, and the
+code under test, and report every problem at once.
+Then they hand the container the resolved settings (defaults applied, repos resolved, the run's
+own directories) as one read-only file, also saved as `<output_dir>/<run id>/settings.json`. The
+tests read only that file: no defaults of their own, no settings in the environment.
 
 ## Running
 
@@ -84,6 +105,13 @@ tests/integration/distro/run.sh                # every distro test (review distr
 Logs go to stderr; the results (TAP) go to stdout and to `<output_dir>/<run id>/report.tap`.
 Files tests export go to `<output_dir>/<run id>/artifacts/<test>/` and stay after the run. Tee
 stderr yourself to keep the log. The exit status is bats': 0 when every test passed.
+
+Runs are serial on purpose: one test at a time, one run at a time, one set of repos. Don't run
+tests in parallel (bats `--jobs`), run two suites at once, or create extra repo sets to speed
+things up. The tests create and delete releases, tags, issues, and workflow runs in bursts, and
+GitHub's abuse detection can flag or suspend an account for that kind of automated activity
+when it's multiplied; its secondary rate limits on content creation hit sooner too. Tests also
+share the one set of repos, so parallel runs would break each other.
 
 ### CI tests
 
@@ -141,7 +169,22 @@ The gateway is versitygw: one public-read bucket (objects only; listing stays de
 files in the run directory, on a private podman network the distro containers join, deleted
 when the test file ends. It checks the published layout over HTTP the way S3 will serve it; the
 distributor's own upload to S3 needs a reachable test bucket and isn't covered. Until the
-keyring package exists, the archive key comes from the published files.
+keyring package exists, the archive key comes from the published files. Its credentials are
+settings (`gateway.access_key`, `gateway.secret_key`): nothing outside its network reaches it,
+and it serves public test data.
+
+With `gateway.keep: true` it stays running after its test file, for inspection: published on
+`127.0.0.1:<gateway.port>` only, with its files in `<output_dir>/<run id>/gateway/`. The end of
+the test file logs its URL and credentials, and the commands that remove every kept gateway
+(their container and network carry the label `distributor-it=gateway`):
+
+```bash
+podman rm -f --filter label=distributor-it=gateway
+podman network prune -f --filter label=distributor-it=gateway
+```
+
+Nothing removes kept gateways automatically; while one holds the port, the next distro run's
+gateway can't start, and says so.
 
 ## Guard
 
