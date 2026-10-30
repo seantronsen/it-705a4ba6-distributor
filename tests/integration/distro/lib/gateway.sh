@@ -131,12 +131,12 @@ EOF
 
 ################################################################################
 # Stops the gateway and deletes its network and files; safe when it never started. A kept
-# gateway is left running instead, and how to reach and remove it is logged.
+# gateway that's running is left running instead, and how to reach and remove it is logged.
 # Globals:
 #   IT_ENGINE
 ################################################################################
 gateway__stop() {
-  if gateway__kept; then
+  if gateway__kept && "$IT_ENGINE" container exists "$(gateway__name)" 2> /dev/null; then
     log__info "gateway kept: http://127.0.0.1:$(settings__get .gateway.port)/repo" \
       "(access key $(settings__get .gateway.access_key)," \
       "secret key $(settings__get .gateway.secret_key)), files in $(gateway__dir)"

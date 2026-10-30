@@ -132,6 +132,10 @@ launch__token() {
 ################################################################################
 launch__repos() {
   local role repo repos='{}' failed=false
+  if ! config__has .repos && [[ ! -f $(config__state_file) ]]; then
+    log__error "no repos: run init.sh, or set repos in $(config__file)"
+    return 1
+  fi
   for role in distributor testbed service2; do
     if ! repo=$(config__repo "$role"); then
       failed=true
