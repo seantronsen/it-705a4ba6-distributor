@@ -68,16 +68,18 @@ github__run_completed() {
 }
 
 ################################################################################
-# Whether a run has jobs whose names start with a prefix, all ending with one conclusion.
+# Whether a run has a job by this name, every instance of it (one per matrix entry, e.g.
+# "prune / prune (rpm)") ending with one conclusion. A reusable workflow's job is named
+# "<caller job> / <job>" when it ran, and just "<caller job>" when the caller was skipped.
 # Arguments:
-#   owner/name, run id, job name prefix (e.g. "admit"), conclusion (e.g. skipped).
+#   owner/name, run id, job name (e.g. "admit / admit", or "admit" when skipped), conclusion.
 # Returns:
 #   0 when there are such jobs and all match, 1 otherwise.
 ################################################################################
 github__jobs_concluded() {
   local conclusions
   conclusions=$(gh api --paginate "repos/$1/actions/runs/$2/jobs?per_page=100" \
-    -q ".jobs[] | select(.name | startswith(\"$3\")) | .conclusion")
+    -q ".jobs[] | select(.name == \"$3\" or (.name | startswith(\"$3 (\"))) | .conclusion")
   [[ -n $conclusions ]] && ! grep -qvx "$4" <<< "$conclusions"
 }
 

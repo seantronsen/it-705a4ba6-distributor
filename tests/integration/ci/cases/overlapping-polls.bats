@@ -43,7 +43,7 @@ not_committed_by() {
   github__run_wait "$distributor" "$first" > /dev/null
   github__run_wait "$distributor" "$second" > /dev/null
   wait__check "first poll admitted v1.0.0" \
-    github__jobs_concluded "$distributor" "$first" admit success
+    github__jobs_concluded "$distributor" "$first" "admit / admit" success
   wait__check "second poll found nothing new" \
     github__jobs_concluded "$distributor" "$second" admit skipped
   wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published
