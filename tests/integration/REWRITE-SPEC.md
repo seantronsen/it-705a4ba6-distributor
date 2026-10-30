@@ -1,7 +1,8 @@
 # Integration suite rewrite: spec
 
-Status: implemented 2026-10-28, not yet run on GitHub (run.sh, init.sh, destroy.sh untested
-remotely). Supersedes the revision list in REPORT-2026-10-28.md.
+Status: v2 implemented 2026-10-28; v3 (section 10 and "v3" at the end) implemented 2026-10-29;
+v4 ("v4" at the end) implemented 2026-10-30. v3 and v4 not yet run on GitHub. Supersedes the
+revision list in REPORT-2026-10-28.md.
 
 ## Implementation notes (decisions taken, deviations)
 
@@ -179,7 +180,7 @@ Last run: ~68 min. Release builds 26 min (6 builds), polls 25 min (23), poll sta
 - client_checks: it isn't a downloader; it ran the dnf and apt install checks against case 11's
   downloaded repositories. The split design is the architecture failure in section 1.
 
-## 10. Split: ci/ and distro/ (decided 2026-10-29, not implemented)
+## 10. Split: ci/ and distro/ (decided and implemented 2026-10-29, v3)
 
 Why: the install checks ran in sibling containers through the host engine's socket, so the
 ci tools container could start containers. S3 and the keyring package will need more
@@ -231,15 +232,102 @@ Docs (docs/integration-tests.md):
   running it.
 - ci: single socket-less container; safe to run without that level of scrutiny.
 
-## Next round
+## v3 (2026-10-29): what changed
 
-- The split above (section 10).
-- debian:13 for the ci tools container (Debian by default unless there's a really good reason).
-- --init on engine__run, so PID 1 in a container handles Ctrl-C (the tools container ignored it
-  during the install, before its trap was set).
-- Doc-comment banners: 80 # characters (162 lines are 39 now).
-- Last step of the revision: drop unused sources (lib/engine.sh sources log.sh for nothing).
-- run.sh --help: open (Sean isn't sure about printing the header via sed; at least to stdout).
-- Rename log__die to log__fatal (systems convention: fatal = log, then exit). Same for the
-  distributor's own scripts: scripts/lib.sh defines die() and the workflow scripts call it; rename
-  it to the matching fatal form there too (not done yet; it touches the shipped scripts).
+Done:
+
+- The split (section 10). Layout: lib/ (log, config, engine, launch: the host side both suites
+  share), run-in-container.sh (both suites' container entry, the suite as its first argument),
+  init.sh, destroy.sh; ci/{run.sh,cases,lib}; distro/{run.sh,cases,lib}.
+- ci: no engine socket; artifacts mount; real-build exports artifacts/real-build in the
+  published layout (rpm/, deb/, keys/archive.asc: both publish targets merged into one tree, the
+  same layout as the future S3 bucket).
+- distro: distro/run.sh requires rootless podman and gets the socket. ci-artifacts.bats:
+  setup_file runs ci/cases/real-build.bats as stage 1 (nested bats with the CI suite's setup and
+  teardown), starts versitygw and loads the artifacts; four tests (dnf/apt x files/HTTP).
+- versitygw: v1.10.0, posix backend with --sidecar for metadata (tmpfs on this kernel lacks
+  user xattrs, which the posix backend needs otherwise). Bucket made, policy set, and files
+  uploaded with curl --aws-sigv4 from a fedora container on the gateway's network. Verified
+  locally: anonymous GET works, anonymous listing is 403, stop leaves nothing behind.
+- lib/distributor.sh split into distributor.sh (seed, reset, config), poll.sh, state.sh,
+  issues.sh. Cases source exactly the modules they call.
+- `|| log__error ... || return 1` replaced by `if ! cmd; then log__error ...; return 1; fi`;
+  log__error only logs now. log__die renamed log__fatal (the suite only).
+- debian:13 tools image (apt; no package cache between runs: runs are transient).
+- --init on engine__run (Ctrl-C during the tool install now works).
+- 80-# banners; unused sources removed; usage (--help) printed to stdout.
+- init/destroy: state file in ~/.local/state/distributor-it/repos.yaml; config.yaml is never
+  written and its repos win; init refuses when config sets repos or the state file exists;
+  destroy skips missing repos with an error and goes on; rand_chars; {1..3}; clearer refusal.
+- Launcher: snapshots each checkout's HEAD into the run dir (git worktrees work: a worktree's
+  .git points outside it); checks the SSH agent holds a key; checks the repos exist up front.
+- package-rules: testbed tags it-c and it-d1 (not v*, which the testbed's release workflow builds).
+- prune-failing: job checks match "prune / prune" (the rpm and deb prune jobs), not "prune",
+  which also matched the report and record jobs (v2 run 20261029T162604Z).
+
+Verified locally (no GitHub): shellcheck clean (bats files through a transform), bats counts 15
+and 4, the apt package list, crafted builds and signing in debian:13, podman-remote 5.4.2
+against the host's podman 4.3.1, the gateway, worktree snapshots, init/destroy refusal paths.
+
+Not verified: any GitHub run of v3; the dnf/apt installs against a real published repository
+(they run only after a real build); docker.
+
+Still open:
+
+- run.sh --help via sed (Sean isn't sure about it).
+- die -> fatal in the distributor's own scripts (scripts/lib.sh, 14 uses): not done, shipped code.
+- Config duplication across the deny tests (three repeat the default testbed entry).
+
+## v4 (2026-10-30): what changed
+
+From Sean's v3 review notes.
+
+Done:
+
+- Configuration: config.defaults.yaml (tracked; every setting, its default, what it means)
+  replaces config.example.yaml. The user's file is ~/.config/distributor-it/config.yaml
+  ($XDG_CONFIG_HOME; IT_CONFIG picks another), optional, only the keys that change; config files
+  only, no env overrides. Merged with jq (YAML to JSON with either yq); a user's checkout entry
+  replaces the default one whole. No defaults in the code: config__get errors on unset keys.
+- No config validation (dropped on Sean's review: not worth it in bash for a transient config):
+  config__get fails, naming the key, when a setting is missing or null.
+- Resolved settings: the launcher writes the merged configuration, the resolved repos, and the
+  run's own values (.run: id, share_dir, output_dir, artifacts_dir, engine) to
+  <output_dir>/<run id>/settings.json, mounted read-only at /run/distributor-it/settings.json.
+  Container libs read it with lib/settings.sh (jq). Gone: every IT_* -e variable (repos,
+  timeouts, keep, images, dirs). Left as env: CONTAINER_HOST and SSH_AUTH_SOCK (the tools'
+  own interfaces); IT_ENGINE and IT_LOG_FD (internal, set inside the container).
+- Checks report everything at once: host tools; then the SSH agent, the token, the engine, the
+  repos, and the code under test together. Same in lifecycle__guard (every repo, every
+  condition), init.sh, destroy.sh, run-in-container.sh.
+- Engine: unset means rootless podman, else podman, else docker, whichever is installed first.
+- Checkouts: {path} (local; relative to this repo's root) or {repo, ref} (GitHub, fetched
+  anonymously over HTTPS with history; ref omitted = latest release). Defaults: distributor
+  path ".", testbed OpenCHAMI/github-actions-testbed at its latest release.
+- Gateway: credentials from config (gateway.access_key, gateway.secret_key); gateway.keep leaves
+  it running after its test file, published on 127.0.0.1:<gateway.port>, files in
+  <output_dir>/<run id>/gateway; container and network labeled distributor-it=gateway; removal
+  commands logged, never automatic; a port clash says so. Named after the run id.
+- Reusable routines in lib files: run-in-container.sh's tool install and GitHub access moved to
+  lib/container.sh; init.sh's rand_chars is lib/random.sh's random__hex.
+- Sean's config: ~/.config/distributor-it/config.yaml (testbed: the local checkout), symlinked
+  from tests/integration/config.yaml (gitignored) for editing.
+
+Verified locally (no GitHub): shellcheck clean; config merge (no file, empty file, overrides); launcher dry runs (all
+problems reported in one pass; remote snapshot by tag and by latest release; a missing remote;
+docker refused for distro; nothing left in /dev/shm); in a debian:13 container through
+podman-remote: tool install from settings, the suite accessors, the gateway unkept (nothing
+left) and kept (host GET on 127.0.0.1, anonymous listing 403, logged removal commands work), and
+a port clash reported.
+
+Not verified: any GitHub run of v3 or v4; the testbed default (it has no release yet, so the
+default checkout fails until one exists or a ref is set).
+
+Still open:
+
+- run.sh --help via sed.
+- die -> fatal in the distributor's own scripts (scripts/lib.sh): shipped code, not done.
+- Config duplication across the deny tests.
+- stage.sh's coupling of distro to ci's setup (Sean: leave for now).
+- Speed: fewer polls by batching the one-poll rejection tests; a lower poll_interval; per-job
+  timings from a kept run (see the run 3 breakdown).
