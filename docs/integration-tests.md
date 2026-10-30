@@ -1,25 +1,46 @@
 # Integration tests
 
-`tests/integration/` tests the distributor end to end on real GitHub with bats-core: each test
-makes releases on throwaway service repos, dispatches polls of a throwaway distributor, and
-checks its state, issues, and published repositories. Unit tests (`tests/unit`, later) are the
-quick sanity check; this is the real insurance.
+`tests/integration/` tests the distributor end to end with bats-core, in two suites:
+
+- `ci/`: the CI integration tests. Each test makes releases on throwaway service repos,
+  dispatches polls of a throwaway distributor on real GitHub, and checks its state, issues, and
+  published repositories. One transient tools container, with no access to the container
+  engine.
+- `distro/`: the distro tests. Each distro's own package manager (dnf on Fedora, apt on Debian)
+  installs from the distributor's published repositories, from the files and over HTTP from a
+  temporary local S3 gateway. A test file first runs the CI tests that produce what it installs.
+
+Unit tests (`tests/unit`, later) are the quick sanity check; these are the real insurance.
 
 The throwaway repos are overwritten completely on every run. Use repos made for this only.
 
+## Security: the distro tests start containers as you
+
+**Review `tests/integration/distro/` (its cases and lib) before running the distro tests.**
+
+The distro tests' tools container gets the API socket of your rootless podman, so code in it
+can start containers as you: with your user's privileges, your files that it mounts, and the
+network access your containers have. That's how it starts the per-distro containers and the S3
+gateway next to itself. Rootless podman is required; the suite refuses docker, whose socket is
+root's. This is a stopgap while alternatives are considered.
+
+The CI tests don't get the socket: their container can reach GitHub with your token and push
+over your SSH agent, nothing on your machine beyond its own mounts. They're safe to run
+without that level of review.
+
 ## Requirements
 
-- podman or docker. The suite runs in one transient tools container (`fedora:42`; bats, gh,
-  git, gpg, rpm and deb tools are installed there); the install checks run in clean sibling
-  containers through the host engine's socket. Nothing is installed on the host.
+- podman (rootless) or docker; the distro tests need rootless podman. Everything runs in a
+  transient `debian:13` tools container (bats, gh, git, gpg, rpm and deb tools are installed
+  there). Nothing is installed on the host.
 - `yq` on the host (either implementation), for the config.
-- `gh`, logged in, with the `repo` scope (`gh auth refresh -s repo`). No `workflow` scope: git
-  pushes go over SSH, where token scopes don't apply.
-  The token reaches the container on stdin only: never a file, the container's environment, or
-  a command line.
-- An SSH agent (`SSH_AUTH_SOCK`) holding a key GitHub accepts: git pushes over SSH through it.
-- Local checkouts of the distributor and the testbed with no uncommitted changes to tracked
-  files. Their HEAD commits are what get tested.
+- `gh`, logged in, with the `repo` scope (`gh auth refresh -s repo`). The token reaches the
+  container on stdin only: never a file, the container's environment, or a command line.
+- An SSH agent (`SSH_AUTH_SOCK`) holding a key GitHub accepts (`ssh-add -l` lists it): git
+  pushes over SSH through it. A key ssh finds on disk isn't enough; the container only sees the
+  agent.
+- Local checkouts of the distributor and the testbed (git worktrees work) with no uncommitted
+  changes to tracked files. Their HEAD commits are what get tested.
 
 ## Repos
 
@@ -29,42 +50,47 @@ tests/integration/destroy.sh   # delete them, when done
 ```
 
 `init.sh` creates `it-<random>-distributor`, `it-<random>-testbed`, and
-`it-<random>-testbed-tools` (public, empty) under your account and records them in
-`tests/integration/repos.yaml` (gitignored; `IT_REPOS` overrides the path). Every run reuses them
-until you destroy them.
+`it-<random>-testbed-tools` (public, empty) under your account and records them in its state
+file, `~/.local/state/distributor-it/repos.yaml` (`IT_STATE` overrides), outside the source
+tree. Every run reuses them until you destroy them. It refuses when the state file exists (to
+keep those repos and make new ones, move the file aside) or when `config.yaml` sets repos.
 
-`destroy.sh` deletes exactly the repos in that file, after checking each is yours and named like
-init's, and only after you type `Y` having seen their names. It also deletes the testbed's images
-in your GHCR namespace, then the file. It needs the `delete_repo` scope, and `delete:packages`
-for the images (`gh auth refresh -s delete_repo,delete:packages`).
+`destroy.sh` deletes exactly the repos in the state file, after checking each is yours and
+named like init's, and only after you type `Y` having seen their names. Repos already gone are
+reported and skipped. It also deletes the testbed's images in your GHCR namespace, then the
+state file. It needs the `delete_repo` scope, and `delete:packages` for the images
+(`gh auth refresh -s delete_repo,delete:packages`). It never touches repos set in `config.yaml`.
 
-Repos made by hand work too: set `repos` in the config instead. package-rules' longer-repo-name
-check runs only when the second service repo's name starts with the testbed's name plus `-`.
+Repos made by hand work too: set `repos` in `config.yaml`, which then wins over the state file.
+package-rules' longer-repo-name check runs only when the second service repo's name starts with
+the testbed's name plus `-`.
 
 ## Configuration
 
 Copy `tests/integration/config.example.yaml` to `tests/integration/config.yaml` (gitignored;
-`IT_CONFIG` overrides the path). It holds every setting that isn't a secret: the checkouts, the
-repos (when not made by init.sh), the images, the engine, the output directory, timeouts, and
-`keep` (skip the end-of-run cleanup to inspect what a run left).
+`IT_CONFIG` overrides the path). Nothing writes to it. It holds every setting that isn't a
+secret: the checkouts, the repos (when not made by init.sh), the images, the engine, the output
+directory, timeouts, and `keep` (skip the end-of-run cleanup to inspect what a run left).
 
 ## Running
 
 ```bash
-tests/integration/run.sh                     # every test
-tests/integration/run.sh retention noop      # these tests (cases/<name>.bats)
-tests/integration/run.sh --filter deny       # bats options pass through
+tests/integration/ci/run.sh                    # every CI test
+tests/integration/ci/run.sh retention noop     # these tests (ci/cases/<name>.bats)
+tests/integration/ci/run.sh --filter deny      # bats options pass through
+tests/integration/distro/run.sh                # every distro test (review distro/ first)
 ```
 
 Logs go to stderr; the results (TAP) go to stdout and to `<output_dir>/<run id>/report.tap`.
-Tee stderr yourself to keep the log. The exit status is bats': 0 when every test passed.
+Files tests export go to `<output_dir>/<run id>/artifacts/<test>/` and stay after the run. Tee
+stderr yourself to keep the log. The exit status is bats': 0 when every test passed.
 
-Each run:
+### CI tests
 
 1. Once (setup_suite): checks the repos (guard, below), generates a throwaway key chain (root, a
    repo key per service repo certified by the root, an archive key), wipes the repos (releases,
-   tags, issues, labels, workflow runs), sets their secrets, and force-pushes the local
-   checkouts with the suite's changes: the distributor gets the default test config, empty
+   tags, issues, labels, workflow runs), sets their secrets, and force-pushes the checkouts'
+   HEAD commits with the suite's changes: the distributor gets the default test config, empty
    state, and no cron schedule (tests dispatch every poll); the testbed pushes its images to
    your GHCR namespace.
 2. Before every test: resets the baseline, so no test depends on another: no releases, tags,
@@ -73,9 +99,8 @@ Each run:
 3. Once at the end (teardown_suite): wipes the repos and deletes their secrets, unless `keep`.
 
 Tests wait on GitHub by checking every `poll_interval` seconds up to `timeout` per wait, never by
-sleeping a fixed time. Ctrl-C stops the running test and still runs the teardowns.
-
-## Tests
+sleeping a fixed time. Ctrl-C stops the running test and still runs the teardowns, which can
+take a minute or more.
 
 | Test | What it checks |
 |---|---|
@@ -93,12 +118,30 @@ sleeping a fixed time. Ctrl-C stops the running test and still runs the teardown
 | package-rules | package name, version, and ownership rules across two repos |
 | release-cap | one poll processes at most MAX_RELEASES releases (lowered to 3) |
 | overlapping-polls | two polls dispatched together admit a release once |
-| install-real-build | a real testbed release (GoReleaser, signing) installs with dnf and apt from the published repositories, signatures checked |
+| real-build | a real testbed release (GoReleaser, signing) is admitted and published; exports the published repositories to `artifacts/real-build` |
 
-Every test but install-real-build uses crafted releases: tiny real rpm and deb packages, signed
-through the run's key chain the way gpg-sign-artifacts signs, on the second service repo (no
-workflows there, so tags trigger nothing). install-real-build is the one test that waits for a
-real release build.
+Every test but real-build uses crafted releases: tiny real rpm and deb packages, signed through
+the run's key chain the way gpg-sign-artifacts signs. They're on the second service repo (no
+workflows there, so tags trigger nothing), or on the testbed under tags that don't start with
+`v` (its release workflow builds `v*` tags). real-build is the one test that waits for a real
+release build.
+
+### Distro tests
+
+Each test file runs in phases: `setup_file` runs its stage 1 (the CI tests that produce what it
+installs, with their own setup and teardown, on the throwaway repos), then each test is one
+distro installing natively in a clean container, and `teardown_file` removes what `setup_file`
+made.
+
+| Test file | What it checks |
+|---|---|
+| ci-artifacts | real-build's published repositories install with dnf (Fedora) and apt (Debian), signatures checked: from the files, and over HTTP from a temporary local S3 gateway |
+
+The gateway is versitygw: one public-read bucket (objects only; listing stays denied) with its
+files in the run directory, on a private podman network the distro containers join, deleted
+when the test file ends. It checks the published layout over HTTP the way S3 will serve it; the
+distributor's own upload to S3 needs a reachable test bucket and isn't covered. Until the
+keyring package exists, the archive key comes from the published files.
 
 ## Guard
 
@@ -107,7 +150,8 @@ either empty or carrying the `.distributor-it` marker file the suite pushes.
 
 ## Notes
 
-- Not covered: the scheduler (GitHub's cron is unreliable), and the release publisher check (not
-  implemented yet).
+- Not covered: the scheduler (GitHub's cron is unreliable), the release publisher check (not
+  implemented yet), and the distributor's upload to S3 (not implemented yet).
 - The testbed's trivy job fails in a personal account (it reads org packages), and its reuse
   check flags the marker file; releases don't depend on either.
+- With docker, files the containers write in the output directory may be owned by root.
