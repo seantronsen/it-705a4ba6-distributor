@@ -1,1 +1,64 @@
-{}
+{
+  "seantronsen/it-705a4ba6-testbed@v1.0.0": {
+    "at": "2026-10-31T18:44:35Z",
+    "packages": [
+      {
+        "arch": "all",
+        "filename": "testbed-quadlet_1.0.0-1_all.deb",
+        "format": "deb",
+        "name": "testbed-quadlet",
+        "sha256": "6a826abf53f1f4a91bde8b6d81b4b7f253ed46dd80e55cd1f8ee006c0f90ee17",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "noarch",
+        "filename": "testbed-quadlet-1.0.0-1.el9.noarch.rpm",
+        "format": "rpm",
+        "name": "testbed-quadlet",
+        "sha256": "6b5735025b6b80d7a04568977e7e6ae3fb532c7f8dff91d4b9d1cc1ce97a077a",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "amd64",
+        "filename": "testbed_1.0.0-1_amd64.deb",
+        "format": "deb",
+        "name": "testbed",
+        "sha256": "bd00d1b3cbe66d30ebfa76cd5a9233548ace0222d65d86a70c8f4de84a3b98b5",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "aarch64",
+        "filename": "testbed-1.0.0-1.el9.aarch64.rpm",
+        "format": "rpm",
+        "name": "testbed",
+        "sha256": "7804c6fbb2572389bed9f115188c6814cc3b9f4f966a4d02fac59dff0e8eba17",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "arm64",
+        "filename": "testbed_1.0.0-1_arm64.deb",
+        "format": "deb",
+        "name": "testbed",
+        "sha256": "226decf86001e87047bfd6108b25fd014eb375dd8375a884f846633bbe76ec7f",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "x86_64",
+        "filename": "testbed-1.0.0-1.el9.x86_64.rpm",
+        "format": "rpm",
+        "name": "testbed",
+        "sha256": "ee1921e6f9fffe3b549f0ce1062354bd2da8398c3c8d4758bfae96b4837787e6",
+        "status": "published",
+        "version": "1.0.0"
+      }
+    ],
+    "repo_key": "A306ED8A2F1850C97035F53D9D971D4A97F7C46A",
+    "run": "https://github.com/seantronsen/it-705a4ba6-distributor/actions/runs/41230857773",
+    "status": "published"
+  }
+}
