@@ -188,6 +188,9 @@ every key on the fly.
   so it no longer depends on personal repos and the real distributor ships nothing test-only
   (sandbox config, test state, test secrets). It will likely work closely with the
   github-actions testbed (testbed releases as its inputs, shared test tags and keys).
+- TODO: a PR template for this repo stating that a PR changing code or config (scripts,
+  workflows, config, tests) must pass every integration test, with the run's report attached,
+  to be eligible for review. Docs-only PRs are exempt.
 
 ## Hosting
 
