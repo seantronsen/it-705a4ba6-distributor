@@ -38,6 +38,9 @@ jql() { jq -L "$ROOT/scripts" "$@"; }
 # The repos list from the config, as JSON.
 config_json() { yq -o=json -I=0 '.repos // []' "$CONFIG"; }
 
+# The config's publishers, keyed by GitHub user ID, as JSON.
+publishers_json() { yq -o=json -I=0 '.publishers // {}' "$CONFIG"; }
+
 state_json() {
   if [[ -s $STATE ]]; then cat "$STATE"; else echo '{}'; fi
 }
@@ -71,6 +74,33 @@ releases_list() { # <owner/repo>
 # A release's assets as a JSON array of {name, id}.
 release_assets() { # <owner/repo> <tag>
   gh_api "repos/$1/releases/tags/$(uri "$2")" | jq -c '[.assets[] | {name, id}]'
+}
+
+# Who pushed and who ran a tag's push runs, as a JSON array of
+# {run, attempt, role, login, id, type}: each run's actor (role "pushed") and the triggering
+# actor of each of its attempts (role "ran"). A re-run replaces the run's triggering actor, so
+# earlier attempts are read one by one. Runs match by head_branch, so pushes to a branch with
+# the tag's name count too. Returns 1 on any API failure (set -e is off in $(...)), so a failed
+# call is an infrastructure error, never an empty list.
+tag_push_actors() { # <owner/repo> <tag>
+  local repo=$1 tag=$2 runs reruns run count n
+  runs=$(gh api --paginate "repos/$repo/actions/runs?event=push&branch=$(uri "$tag")&per_page=100" \
+      --jq '.workflow_runs[]' \
+    | jq -c --arg t "$tag" 'select(.event == "push" and .head_branch == $t)
+        | {run: .id, attempt: .run_attempt, actor, triggering_actor}') || return 1
+  reruns=$(jq -r 'select(.attempt > 1) | "\(.run) \(.attempt)"' <<< "$runs") || return 1
+  {
+    jq -c '{run, attempt} as $r
+      | (.actor | {login, id, type} + $r + {role: "pushed"}),
+        (.triggering_actor | {login, id, type} + $r + {role: "ran"})' <<< "$runs" || return 1
+    while read -r run count; do
+      for ((n = 1; n < count; n++)); do
+        gh api "repos/$repo/actions/runs/$run/attempts/$n" \
+          --jq '{run: .id, attempt: .run_attempt, role: "ran"} + (.triggering_actor | {login, id, type})' \
+          || return 1
+      done
+    done <<< "$reruns"
+  } | jq -s -c .
 }
 
 asset_fetch() { # <owner/repo> <asset-id> <dest>

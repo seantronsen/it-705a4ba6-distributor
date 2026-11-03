@@ -8,6 +8,14 @@ def repo_of: split("@")[0];
 # Config entries keyed by repo name.
 def by_name: map({key: .name, value: .}) | from_entries;
 
+# Whether GitHub user $id may publish $repo's releases ($pubs: the config's publishers, keyed by
+# user ID; a username can be renamed and then registered by someone else, an ID can't). No entry:
+# no. An entry without `repos` (core maintainers): any repo. With `repos`: only those.
+def may_publish($pubs; $id; $repo):
+  ($repo | ascii_downcase) as $r
+  | $pubs["\($id)"] as $p
+  | $p != null and ($p.repos == null or any($p.repos[]; ascii_downcase == $r));
+
 # Packages currently published, from state (input), with their release key and repo:
 # [{release, repo, format, name, version, arch, filename, sha256}]
 def published_packages:

@@ -3,8 +3,9 @@
 #
 #   admit.sh <owner/repo> <tag> <outdir>
 #
-# Downloads the sidecars, verifies the trust chain with github-actions' gpg-verify-trust-chain.sh
-# (VERIFY_CHAIN_URL; root key from MASTER_PUBLIC_ASC and MASTER_FPR), then checks the packages.
+# Downloads the sidecars, checks that a publisher pushed the tag (config `publishers`), verifies
+# the trust chain with github-actions' gpg-verify-trust-chain.sh (VERIFY_CHAIN_URL; root key from
+# MASTER_PUBLIC_ASC and MASTER_FPR), then checks the packages.
 #
 # Writes <outdir>/result.json with status published, skipped, or rejected (plus reasons), and the
 # admitted packages under <outdir>/files/. Exits non-zero only for infrastructure errors (API,
@@ -35,6 +36,32 @@ finish() { # <status> [reason...]
 }
 
 cfg=$(config_json)
+
+# Rejects the release unless everyone who pushed its tag or ran its push runs may publish this
+# repo (config `publishers`). Backstop for a repo missing its `v*` tag ruleset.
+#
+# Every run counts, not just the latest: the API doesn't say which run published the release.
+# E.g. a non-publisher's run publishes, then a publisher re-pushes the tag; that run fails the
+# draft guard, so the latest run is the publisher's but the release isn't. No run: rejected.
+check_publisher() {
+  local pubs actors reasons=()
+  pubs=$(publishers_json)
+  actors=$(tag_push_actors "$repo" "$tag")
+  [[ $(jq length <<< "$actors") -gt 0 ]] \
+    || finish rejected "no push run found for tag $tag, so its publisher can't be checked"
+  # Usernames are labels only; flag a listed ID whose username has since changed.
+  jq -r --argjson p "$pubs" 'unique_by(.id)[] | . as $x | $p["\($x.id)"] // empty
+    | select((.username | ascii_downcase) != (($x.login // "") | ascii_downcase))
+    | "warning: publisher \($x.id) is listed as \(.username) but is now \($x.login)"' \
+    <<< "$actors" | while read -r line; do log "$line"; done
+  mapfile -t reasons < <(jql -r --argjson p "$pubs" --arg repo "$repo" 'include "lib";
+    map(select(may_publish($p; .id; $repo) | not)) | group_by(.id)[]
+    | "\(.[0].login // "unknown") (id \(.[0].id // "none"), \(.[0].type // "unknown")) may not"
+      + " publish \($repo) (\(map(.role) | unique | join(", ")):"
+      + " \(map("run \(.run) attempt \(.attempt)") | unique | join(", ")))"' \
+    <<< "$actors")
+  [[ ${#reasons[@]} -eq 0 ]] || finish rejected "${reasons[@]}"
+}
 
 fetch_sidecars() {
   release_assets "$repo" "$tag" > "$out/assets.json"
@@ -161,5 +188,6 @@ check_packages() {
 }
 
 fetch_sidecars
+check_publisher
 verify_chain
 check_packages
