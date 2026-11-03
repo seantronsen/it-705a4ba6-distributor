@@ -1,0 +1,28 @@
+# Validates config/repos.yaml against config/repos.schema.json on every PR, so main only ever
+# gets a valid config (make it a required status check). Poll validates again before reading.
+#
+# The one pull_request workflow: no secrets and read-only, so a PR can't reach anything. No paths
+# filter, since a required check that doesn't run blocks the PR.
+name: validate-config
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # pipx run needs nothing on PATH; the version comes from config/requirements.txt.
+      - name: Validate the config
+        run: |
+          pipx run --spec "$(grep '^check-jsonschema==' config/requirements.txt)" check-jsonschema \
+            --schemafile config/repos.schema.json config/repos.yaml

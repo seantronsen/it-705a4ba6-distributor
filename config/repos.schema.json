@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "repos.schema.json",
+  "title": "Distributor config (config/repos.yaml)",
+  "description": "Who may publish, and the service repos to poll. See the comments in config/repos.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["publishers", "repos"],
+  "properties": {
+    "publishers": {
+      "description": "Keyed by GitHub user ID (gh api users/<username> -q .id), the only thing checked.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+      "additionalProperties": { "$ref": "#/$defs/publisher" }
+    },
+    "repos": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repo" }
+    }
+  },
+  "$defs": {
+    "repoName": {
+      "description": "owner/repo on GitHub.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+    },
+    "version": {
+      "description": "major.minor.patch, quoted.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["username"],
+      "properties": {
+        "username": {
+          "description": "GitHub username; a label for readers.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+        },
+        "repos": {
+          "description": "The repos this publisher may publish. Leave it out for every repo.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/repoName" }
+        }
+      }
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/repoName" },
+        "allow": {
+          "description": "Extra package names beyond <repo> and <repo>-*.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.+_-]*$" }
+        },
+        "deny": {
+          "description": "Revoked repo keys.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fingerprint"],
+            "properties": {
+              "fingerprint": {
+                "description": "The repo key's fingerprint, quoted.",
+                "type": "string",
+                "pattern": "^[0-9A-Fa-f]{40}$"
+              },
+              "since": {
+                "description": "UTC timestamp, YYYY-MM-DDTHH:MM:SSZ (what jq's fromdateiso8601 parses), quoted: prune only what was admitted from then on.",
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+              },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "retain": {
+          "description": "Exact package versions never pruned.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version"],
+            "properties": {
+              "package": { "type": "string", "minLength": 1 },
+              "version": { "$ref": "#/$defs/version" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "keep-releases": {
+          "description": "major.minor lines kept past end of life, quoted (unquoted 1.10 reads as 1.1).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" }
+        }
+      }
+    }
+  }
+}

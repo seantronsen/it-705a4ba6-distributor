@@ -34,6 +34,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: echo "sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}" --jq .sha)" >> "$GITHUB_OUTPUT"
+      # A bad config fails the run here, before admit could reject releases over it.
+      - name: Check out the config
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          persist-credentials: false
+      # pipx run needs nothing on PATH; the version comes from config/requirements.txt.
+      - name: Validate the config
+        run: |
+          pipx run --spec "$(grep '^check-jsonschema==' config/requirements.txt)" check-jsonschema \
+            --schemafile config/repos.schema.json config/repos.yaml
 
   discover:
     needs: config

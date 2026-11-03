@@ -1,0 +1,3 @@
+# Python tools for validating the config against repos.schema.json
+# pinned; Renovate updates them.
+check-jsonschema==0.39.0

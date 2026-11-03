@@ -1,4 +1,128 @@
-# Service repos the distributor polls, each with optional allow, deny, retain, and keep-releases.
+---
+# yaml-language-server: $schema=repos.schema.json
+# config/repos.yaml
+#
+# =============================================================================
+# Distributor - Configuration
+# =============================================================================
+#
+# Who may publish, and which service repos the distributor polls for signed
+# releases, with the rules for each. This is the live config: poll reads it from
+# the latest main commit on every run.
+#
+# A push that changes this file triggers a poll right away, so a new repo, a new
+# publisher, or a deny takes effect within minutes. Poll first validates the
+# file against repos.schema.json and fails the whole run on any problem, before
+# admitting anything: a bad config never rejects a release, since a rejection is
+# permanent.
+#
+# Rejections caused by the config (a package name missing from allow, a
+# publisher missing from publishers) are permanent too. Fix the config first,
+# then the service repo ships a new patch release.
+
+# -------------------------------------------------------------------------
+# Publishers
+# -------------------------------------------------------------------------
+
+# Who may publish releases. Everyone who pushed a release's tag, or ran (or
+# re-ran) any of that tag's workflow runs, must be listed here and allowed for
+# the release's repo, or the release is rejected. Anyone not listed may publish
+# nothing.
+#
+# This backs up the `v*` tag ruleset each service repo needs: the release
+# workflow signs whatever a `v*` tag points at, for whoever pushed it.
+#
+# Keyed by GitHub user ID, the only thing checked: a username can be renamed and
+# then registered by someone else, an ID can't. Look one up with:
+#
+#   gh api users/<username> -q .id
+#
+# Under each ID:
+#
+#   username: GitHub username (required). A label for readers; admit logs a
+#             warning when it no longer matches the ID.
+#   repos: the repos this publisher may publish (optional; case doesn't
+#          matter). Leave it out for core maintainers, who may publish every
+#          repo. Set it for project leads trusted with their own projects only.
+#          Never empty. A repo that isn't under `repos` below is never polled,
+#          so listing one does nothing.
+#
+# The list can't be empty.
+#
+# Example:
+#
+#   publishers:
+#     60711680: {username: seantronsen}          # every repo
+#     12345678:
+#       username: someone
+#       repos: [OpenCHAMI/fru-tracker]           # these only
+publishers:
+  60711680: {username: seantronsen}
+
+# -------------------------------------------------------------------------
+# Service Repos
+# -------------------------------------------------------------------------
+
+# The repos to poll. A release is a candidate when it's published and not a
+# GitHub prerelease. Its packages are published only if it passes every check:
+# publisher, trust chain (repo key certified as `<owner>/<repo> RPM Signing
+# Key` by the root key), checksums, package names, and versions.
+#
+# Removing an entry stops polling that repo; its published packages stay, under
+# the default retention below.
+#
+# Each entry:
+#
+#   name: owner/repo on GitHub (required).
+#
+#   allow: extra package names this repo may publish (optional). By default a
+#          repo may publish only packages named `<repo>` or `<repo>-*` (its
+#          name lowercased), read from the package metadata, never the
+#          filename. Even then, a name stays with the repo that first
+#          published it, a name in another repo's allow is that repo's, and a
+#          name matching a longer configured repo name's rule (`smd-tools` when
+#          both `smd` and `smd-tools` are configured) is the longer one's.
+#
+#   deny: revoked repo keys (optional). Each entry:
+#     fingerprint: the repo key's fingerprint (required; quote it).
+#     since:       UTC timestamp, exactly YYYY-MM-DDTHH:MM:SSZ (optional;
+#                  quote it). Only packages admitted at or after it are
+#                  pruned. Without it, every package admitted with this key
+#                  is.
+#     reason:      why (optional; goes into the issue).
+#     Every new release signed with a denied key is rejected, whatever since
+#     says. The push that adds the entry triggers prune, which removes the
+#     packages and opens a `Denied repo key` issue listing them.
+#
+#   retain: exact package versions never pruned, e.g. pinned by a live
+#           deployment or a lockfile (optional). Each entry:
+#     package: package name (required).
+#     version: major.minor.patch (required).
+#     reason:  why (optional; for readers).
+#
+#   keep-releases: major.minor lines kept past end of life (optional): the
+#                  latest patch of each stays even once its major is two or
+#                  more behind. Quote them: unquoted 1.10 reads as 1.1.
+#
+# Default retention, per package and architecture (an assumption pending group
+# discussion): the current major and the one before keep the latest patch of
+# each minor; superseded patches and older majors are pruned, except what
+# retain or keep-releases keeps.
+#
+# Example:
+#
+#   repos:
+#     - name: OpenCHAMI/smd
+#       keep-releases: ["1.4"]
+#       retain:
+#         - {package: smd, version: "2.19.4", reason: pinned by a live deployment}
+#     - name: OpenCHAMI/release
+#       allow: [openchami]
+#     - name: OpenCHAMI/tokensmith
+#       deny:
+#         - fingerprint: "0000000000000000000000000000000000000000"
+#           since: "2026-01-01T00:00:00Z"
+#           reason: leaked and rotated
 repos:
   - name: OpenCHAMI/github-actions-testbed
     allow: [testbed, testbed-quadlet]
