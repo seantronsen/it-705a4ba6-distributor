@@ -23,7 +23,7 @@ GITHUB_API=${GITHUB_API_URL:-https://api.github.com}
   DEB_ARCHES=(amd64 arm64)
   # github-actions' trust-chain check, pinned by commit; Renovate updates the tag and commit.
   # renovate: datasource=github-tags depName=OpenCHAMI/github-actions currentValue=v4.0.0
-  VERIFY_CHAIN_URL=https://raw.githubusercontent.com/OpenCHAMI/github-actions/4dc5bc0542a70beffd00cb218a46cb14650fc638/scripts/gpg-verify-trust-chain.sh
+  VERIFY_CHAIN_URL=https://raw.githubusercontent.com/OpenCHAMI/github-actions/ec67a926c858892c2e5e18fed111d7a7720384f3/scripts/gpg-verify-trust-chain.sh
 }
 
 log() { printf '%s\n' "$*" >&2; }

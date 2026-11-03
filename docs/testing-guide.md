@@ -13,8 +13,8 @@ runs have since been deleted. GitHub's scheduler fires the `*/10` poll only a fe
 ## 0. Before you start
 
 - Commit the prototype on `main`.
-- Keep github-actions commit `4dc5bc0` (PR 58's head) reachable: `VERIFY_CHAIN_URL` in
-  `scripts/lib.sh` pins it. Don't force-push it away; if you do, re-pin.
+- Keep github-actions commit `ec67a92` (refactor-gpg-chain-verify's head) reachable:
+  `VERIFY_CHAIN_URL` in `scripts/lib.sh` pins it. Don't force-push it away; if you do, re-pin.
 
 ## 1. A repo to run in
 
