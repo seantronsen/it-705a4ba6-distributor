@@ -71,4 +71,4 @@ done | xargs -0 -n 2 -P 8 bash -c 'source "$0"; target_put "$1" "$2"' "$ROOT/scr
 if [[ $fmt == rpm ]]; then rpm_metadata_write "$meta"; else apt_metadata_write "$meta"; fi
 
 keys_write
-log "publish $fmt: done ($PUBLISH_DIR)"
+log "publish $fmt: done ($TARGET)"

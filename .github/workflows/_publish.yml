@@ -9,6 +9,10 @@ on:
         required: false
       ARCHIVE_GPG_PASSPHRASE:
         required: false
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
 
 permissions: {}
 
@@ -43,6 +47,8 @@ jobs:
           FORMAT: ${{ matrix.format }}
           ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
           ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         # One artifact downloads straight into admit/, several into admit/<name>/: find the
         # admit dirs by their result.json.
         run: |

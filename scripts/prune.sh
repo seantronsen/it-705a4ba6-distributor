@@ -62,4 +62,4 @@ while IFS=$'\t' read -r name filename; do
   target_rm "$(package_path "$fmt" "$name" "$filename")"
 done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
 
-log "prune $fmt: done ($PUBLISH_DIR)"
+log "prune $fmt: done ($TARGET)"

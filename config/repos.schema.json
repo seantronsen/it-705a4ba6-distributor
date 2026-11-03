@@ -7,6 +7,33 @@
   "additionalProperties": false,
   "required": ["publishers", "repos"],
   "properties": {
+    "target": {
+      "description": "Where to publish. Without it, each job publishes to a throwaway local directory (inspection only).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["s3"],
+      "properties": {
+        "s3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bucket", "region", "metadata-max-age"],
+          "properties": {
+            "bucket": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$" },
+            "region": { "type": "string", "minLength": 1 },
+            "endpoint": {
+              "description": "For S3-compatible services other than AWS.",
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "metadata-max-age": {
+              "description": "Seconds caches may keep metadata and keys (Cache-Control max-age), e.g. 300.",
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
     "publishers": {
       "description": "Keyed by GitHub user ID (gh api users/<username> -q .id), the only thing checked.",
       "type": "object",

@@ -5,9 +5,10 @@
 #   CONFIG                 config file (default config/repos.yaml)
 #   STATE                  state file (default state/state.json)
 #   GITHUB_TOKEN           token for the GitHub API (releases, assets, issues)
-#   PUBLISH_DIR            local publish target (required)
-#   PUBLISH_S3_URI, PUBLISH_DOMAIN   remote publish targets (not implemented in v1)
-#   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (default: throwaway key)
+#   PUBLISH_DIR            local publish target, used when the config sets no `target`
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   credentials for the config's `target.s3`
+#   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (default, local target only:
+#                          throwaway key)
 #   ARCHIVE_GPG_PASSPHRASE its passphrase, if any
 #   MASTER_PUBLIC_ASC, MASTER_FPR   root public key and fingerprint (admit)
 
@@ -126,29 +127,77 @@ issue_create() { # <title> <label> <body>
 
 # --- Publish target ---------------------------------------------------------------------------
 
+# The target is the config's `target.s3` bucket, or else the local directory PUBLISH_DIR.
+# Exports the settings, since publish runs target_put in child processes.
 target_init() {
-  if [[ -n ${PUBLISH_S3_URI:-} || -n ${PUBLISH_DOMAIN:-} ]]; then
-    die "S3 and domain publish targets aren't implemented yet; unset PUBLISH_S3_URI/PUBLISH_DOMAIN"
+  local s3
+  s3=$(yq -o=json -I=0 '.target.s3 // {}' "$CONFIG")
+  TARGET_S3_BUCKET=$(jq -r '.bucket // empty' <<< "$s3")
+  TARGET_S3_REGION=$(jq -r '.region // empty' <<< "$s3")
+  TARGET_S3_ENDPOINT=$(jq -r '.endpoint // empty' <<< "$s3")
+  TARGET_S3_METADATA_MAX_AGE=$(jq -r '.["metadata-max-age"] // empty' <<< "$s3")
+  export TARGET_S3_BUCKET TARGET_S3_REGION TARGET_S3_ENDPOINT TARGET_S3_METADATA_MAX_AGE
+  if [[ -n $TARGET_S3_BUCKET ]]; then
+    # A throwaway key on a real target would publish packages nobody can verify.
+    [[ -n ${ARCHIVE_GPG_KEY:-} ]] || die "target.s3 is set, so ARCHIVE_GPG_KEY is required"
+    TARGET=s3://$TARGET_S3_BUCKET
+  else
+    mkdir -p "${PUBLISH_DIR:?PUBLISH_DIR is required without target.s3}"
+    TARGET=$PUBLISH_DIR
   fi
-  mkdir -p "${PUBLISH_DIR:?PUBLISH_DIR is required}"
+  export TARGET
 }
 
-target_get() { # <path> <dest>; 1 when absent
-  [[ -f $PUBLISH_DIR/$1 ]] || return 1
+s3() { aws --region "$TARGET_S3_REGION" ${TARGET_S3_ENDPOINT:+--endpoint-url "$TARGET_S3_ENDPOINT"} "$@"; }
+
+# Packages never change; metadata and keys do, so caches (a CDN) refetch them after
+# target.s3.metadata-max-age seconds.
+cache_control() { # <path>
+  case $1 in
+    rpm/packages/* | deb/pool/*) echo 'public,max-age=31536000,immutable' ;;
+    *) echo "public,max-age=$TARGET_S3_METADATA_MAX_AGE,must-revalidate" ;;
+  esac
+}
+
+# 1 when absent; dies on any other error, since "absent" makes publish rebuild the metadata from
+# scratch. On S3, absence reads as NoSuchKey only with s3:ListBucket (else AccessDenied).
+target_get() { # <path> <dest>
+  local err
   mkdir -p "$(dirname "$2")"
-  cp "$PUBLISH_DIR/$1" "$2"
+  if [[ -z $TARGET_S3_BUCKET ]]; then
+    [[ -f $PUBLISH_DIR/$1 ]] || return 1
+    cp "$PUBLISH_DIR/$1" "$2"
+  elif ! err=$(s3 s3api get-object --bucket "$TARGET_S3_BUCKET" --key "$1" "$2" 2>&1 > /dev/null); then
+    [[ $err == *NoSuchKey* ]] && return 1
+    die "can't read $TARGET/$1: $err"
+  fi
 }
 
 target_put() { # <src> <path>; atomic per file
+  if [[ -n $TARGET_S3_BUCKET ]]; then
+    s3 s3 cp --only-show-errors --cache-control "$(cache_control "$2")" "$1" "$TARGET/$2"
+    return
+  fi
   local dest=$PUBLISH_DIR/$2
   mkdir -p "$(dirname "$dest")"
   cp "$1" "$dest.tmp.$$"
   mv -f "$dest.tmp.$$" "$dest"
 }
 
-target_rm() { rm -f "$PUBLISH_DIR/$1"; }
+target_rm() { # <path>
+  if [[ -n $TARGET_S3_BUCKET ]]; then
+    s3 s3 rm --only-show-errors "$TARGET/$1"
+  else
+    rm -f "$PUBLISH_DIR/$1"
+  fi
+}
 
 target_ls() { # <dir>: file names directly in it
+  if [[ -n $TARGET_S3_BUCKET ]]; then
+    s3 s3api list-objects-v2 --bucket "$TARGET_S3_BUCKET" --prefix "$1/" --delimiter / --output json \
+      | jq -r --arg p "$1/" '(.Contents // [])[].Key | ltrimstr($p)'
+    return
+  fi
   [[ -d $PUBLISH_DIR/$1 ]] || return 0
   find "$PUBLISH_DIR/$1" -maxdepth 1 -type f ! -name '*.tmp.*' -printf '%f\n'
 }

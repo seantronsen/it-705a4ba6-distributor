@@ -42,15 +42,17 @@ rpm_metadata() { # <work> <new> <excludes>
   echo "$result"
 }
 
-# Writes the rpm repodata to the target: data files first, then repomd.xml and its signature,
-# then removes repodata files the new repomd.xml no longer references.
+# Writes the rpm repodata to the target: data files first, then the signature, then repomd.xml
+# last (it points at everything else), then removes repodata files it no longer references.
+# The signature and repomd.xml can't change together, so between the two writes dnf fails
+# closed on a mismatch instead of reading a repomd.xml that points at missing files.
 rpm_metadata_write() { # <dir holding repodata/>
   local dir=$1 f
   for f in "$dir"/repodata/*; do
     case ${f##*/} in repomd.xml | repomd.xml.asc) ;; *) target_put "$f" "rpm/repodata/${f##*/}" ;; esac
   done
-  target_put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
   target_put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
+  target_put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
   for f in $(target_ls rpm/repodata); do
     [[ -e $dir/repodata/$f ]] || target_rm "rpm/repodata/$f"
   done

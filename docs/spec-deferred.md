@@ -9,17 +9,16 @@ reconciling with the reworked prototype.
 
 1. Integration suite (Testing).
 2. Release publisher check (done; suite TODO).
-3. Gap: the same version in two releases of one batch isn't caught.
-4. Gap: `_publish.yml` hardcodes `poll-admit-*` (the keyring needs another input).
-5. Tentative: stop paging releases once discover reaches ones already in state.
-6. Keepalive workflow.
-7. S3 target, with prune checking the bucket against state (Hosting).
-8. Archive key management and the keyring package.
-9. Adopt github-actions' `Makefile.common` (after v4 lands).
-10. Unit tests: rework `seantronsen/wip/tests`.
-11. Test redesign: integration and unit together, per the review notes (Testing).
-12. Presentation.
-13. Trigger mechanism (cron fires only a few times a day).
+3. Gap: `_publish.yml` hardcodes `poll-admit-*` (the keyring needs another input).
+4. S3 target, with prune checking the bucket against state (Hosting).
+5. Archive key management and the keyring package.
+6. Adopt github-actions' `Makefile.common` (after v4 lands).
+7. Unit tests: rework `seantronsen/wip/tests`.
+8. Test redesign: integration and unit together, per the review notes (Testing).
+9. Presentation.
+10. Keepalive workflow.
+11. Trigger mechanism (cron fires only a few times a day).
+12. Tentative: stop paging releases once discover reaches ones already in state.
 
 Deferred, possibly indefinitely: state on its own branch, apk and pacman, per-distro-version
 repositories, the notifier.
@@ -271,7 +270,7 @@ the publisher check above). Then the testing-guide's presentation run as the dem
   with no sidecars; the first polls reject each one (256 per poll, oldest first) and open an
   issue per release, until state covers them all. That's intended.
 - `releases_list` gets more expensive as releases accumulate (every poll lists every release);
-  see Order, item 5.
+  see Order, item 12.
 
 ## Possibly never
 

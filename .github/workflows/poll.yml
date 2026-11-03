@@ -77,6 +77,8 @@ jobs:
     secrets:
       ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
       ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   record:
     needs: publish
@@ -100,3 +102,5 @@ jobs:
     secrets:
       ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
       ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
