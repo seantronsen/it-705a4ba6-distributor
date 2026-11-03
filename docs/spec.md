@@ -15,11 +15,15 @@ Background: github-actions `docs/signing.md` (keys, release flow) and `docs/dist
 
 - rpm and deb only. One rpm repository and one apt suite (`stable`), covering amd64, arm64, and
   noarch/all.
-- Publishes to a transient local target: each run's target is uploaded as a workflow artifact.
-  All target access goes through the `target_*` functions in `lib.sh`, which is where S3 or a
-  domain plugs in later.
-- Signs with the `ARCHIVE_GPG_KEY` secret, or a throwaway key generated per job when it's unset,
-  and publishes that key's public half as `keys/archive.asc` in the target.
+- Publishes to the S3 (or S3-compatible) bucket in the config's `target.s3`, with credentials
+  from the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Without `target`, each job
+  publishes to a transient local directory, uploaded as a workflow artifact for inspection. All
+  target access goes through the `target_*` functions in `lib.sh`. Bucket and CDN setup:
+  [deployment.md](deployment.md).
+- Signs with the `ARCHIVE_GPG_KEY` secret and publishes its public half as `keys/archive.asc` in
+  the target. With the local target only, an unset key means a throwaway key per job.
+- Uploads set `Cache-Control`: packages immutable (a version never changes), metadata and keys
+  `target.s3.metadata-max-age` seconds.
 - Shell scripts plus GitHub Actions workflows. Runs only in CI.
 
 Not in scope: building service packages, container images (they have their own attestations),
@@ -108,11 +112,11 @@ prune:  prune (per format) -> record
 - One concurrency group (`poll`) with `cancel-in-progress: false` covers every workflow that
   writes the target or state, so a run is never cancelled mid-write, two runs never rebuild the
   same metadata at once, and GitHub keeps at most one waiting run.
-- A waiting run starts on the commit it was queued on, which predates the state its predecessor
-  just committed. So poll's first job, `config`, resolves the latest `main` commit and validates
-  its config against the schema (a bad config fails the run, never rejects a release), and
-  discover and admit both check out that commit: the same state and config for both. Prune checks out
-  the latest `main` itself, since it must also see this run's own record.
+- A waiting run starts on the commit it was queued on, which predates the state its predecessor just
+  committed. So poll's first job, `config`, resolves the latest `main` commit and validates its
+  config against the schema (a bad config fails the run, never rejects a release), and discover and
+  admit both check out that commit: the same state and config for both. Prune checks out the latest
+  `main` itself, since it must also see this run's own record.
 - Every job has `timeout-minutes: 30`.
 - Jobs run on `ubuntu-latest` with its own tools (jq, curl, gpg, rpm, dpkg, mikefarah yq), with no
   container. Only publish and prune install what the runner lacks (`createrepo-c`, and
@@ -224,6 +228,10 @@ remove.
    - Denied: admitted with a repo key in its repo's `deny` (all of them, or those admitted at or
      after `since`).
    - Retention (below), over what's left, per `(package, arch)`.
+   - Orphans: any package file on the target (`rpm/packages/`, `deb/pool/`; never `keys/` or
+     metadata) that state doesn't list as published, left by a run that died mid-publish or by
+     the escape hatch. They aren't in state, so nothing is recorded for them. Safe because
+     prune runs in the `poll` concurrency group, never alongside publish.
 2. Rewrite the metadata without the pruned packages: rpm with `createrepo_c --update --skip-stat
    --recycle-pkglist --excludes <pruned>`; apt by dropping their stanzas by `Filename`. Re-sign.
 3. Then delete the pruned package files and any superseded repodata files.
@@ -296,8 +304,8 @@ keys/archive.asc
   (with a `reason`).
 - One file. Parallel jobs never write it; the only writers (poll's and prune's record steps)
   already share a concurrency group. Updates are key lookup and replace.
-- State is the source of truth for "already processed" and for what's currently published, so
-  nothing has to list the publish target.
+- State is the source of truth for "already processed" and for what's currently published; the
+  target is listed only by prune, to remove what state doesn't list.
 - State is also the public record of publication. This repo is the one authority that publishes
   packages under the archive key, and every decision it makes (each package published or pruned,
   with its sha256, the repo key that admitted it, and the run; each rejected or skipped release,
@@ -359,10 +367,12 @@ archive key); only future admission changes. Handled manually.
 
 ## Phases
 
-1. **Local core:** the scripts against the transient local target, with the throwaway archive
-   key. Done; being reworked per review 1.
+1. **Local core:** the scripts.
 2. **Workflows:** poll with the admit and publish matrices, record (state commits, issues), and
    prune.
+3. **S3 target** and the release publisher check.
+
+All three make up the prototype.
 
 Later phases are in [spec-deferred.md](spec-deferred.md).
 

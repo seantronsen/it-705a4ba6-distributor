@@ -1,35 +1,30 @@
 # Distributor spec: deferred
 
-Everything outside the prototype ([spec.md](spec.md)). Parked work lives on branches:
-`seantronsen/wip/rekey-keyring` (archive key management and the keyring package),
-`seantronsen/wip/keepalive`, and `seantronsen/wip/tests`. All three predate review 1 and need
+Everything outside the prototype ([spec.md](spec.md)). Archive key management and the keyring
+package are on `seantronsen/feat/keyring`. Parked work lives on branches:
+`seantronsen/wip/keepalive` and `seantronsen/wip/tests`. Both predate review 1 and need
 reconciling with the reworked prototype.
 
 ## Order
 
-1. Integration suite (Testing).
-2. Release publisher check (done; suite TODO).
-3. Gap: `_publish.yml` hardcodes `poll-admit-*` (the keyring needs another input).
-4. S3 target, with prune checking the bucket against state (Hosting).
-5. Archive key management and the keyring package.
-6. Adopt github-actions' `Makefile.common` (after v4 lands).
-7. Unit tests: rework `seantronsen/wip/tests`.
-8. Test redesign: integration and unit together, per the review notes (Testing).
-9. Presentation.
-10. Keepalive workflow.
-11. Trigger mechanism (cron fires only a few times a day).
-12. Tentative: stop paging releases once discover reaches ones already in state.
+1. Adopt github-actions' `Makefile.common`.
+2. Unit tests: rework `seantronsen/wip/tests`.
+3. Test redesign: integration and unit together, per the review notes (Testing).
+4. Revise the whole repo, workflows through scripts (not tests): the cleanup TODOs under Later.
+5. Presentation.
+6. Keepalive workflow.
+7. Trigger mechanism (cron fires only a few times a day).
+8. Tentative: stop paging releases once discover reaches ones already in state.
 
 Deferred, possibly indefinitely: state on its own branch, apk and pacman, per-distro-version
 repositories, the notifier.
 
 ## Archive key management
 
-Parked on `seantronsen/wip/rekey-keyring`.
+On `seantronsen/feat/keyring`.
 
 - `ARCHIVE_GPG_KEY` (and passphrase, if any) is a secret on this repo. The public key is committed
-  as `keys/archive.asc` and published at the same path in the target. The throwaway-key fallback
-  is only allowed with the local target: with S3 or a domain configured and no key, the run fails.
+  as `keys/archive.asc` and published at the same path in the target.
 - Creating an archive key: generate it as its own primary key (not a subkey of the root key), and
   have the offline root key certify it, the same way the root certifies repo keys. dnf and apt
   ignore certifications, so clients are unaffected; the certification lets anyone verify that an
@@ -40,10 +35,12 @@ Parked on `seantronsen/wip/rekey-keyring`.
 - `keys/` holds `archive.asc` (what clients import), `archive-next.asc` and
   `archive-previous.asc` during a rotation, and `revoked-<fingerprint>.asc`. The target carries
   the same files under `keys/`.
-- `scripts/check-keys.sh` runs at the start of every poll: it fails the run within 30 days of the
+- `scripts/check-keys.sh` runs in poll's `keys` job, before discover: it fails the run within 30 days of the
   archive key's expiry and opens or updates an `Archive key expiring` issue, and fails if
   `ARCHIVE_GPG_KEY`'s public key doesn't match `keys/archive.asc` (e.g. a half-finished switch).
-  Both checks are skipped for a throwaway key.
+  Both checks are skipped for a throwaway key. It also opens or updates an `Archive key switch
+  due` issue once `keys/archive-next.asc` has been committed for 30 days (the grace period is
+  over; rotation step 3 is due), without failing the run; the switch commit closes it.
 - Packages are signed with whatever archive key was current when they were published, so a key
   change has to reach every package still published. Retention bounds that set. rpms record
   which archive key signed them (`signed_with` in state), so `rekey` can resume.
@@ -90,13 +87,12 @@ Same switch and `rekey` run, immediately, with a freshly generated key and no gr
 
 ## Keyring package
 
-`openchami-archive-keyring` (rpm and deb), built from `keyring/.goreleaser.yaml`: GoReleaser with
-`builds: skip` and an nfpm `meta` package of the key files, in snapshot mode with
-`snapshot.version_template` set to a plain `major.minor.patch` from the workflow, the patch bumped
-on every build, so retention keeps only the latest keyring. It installs every public key in
+`openchami-keyring` (rpm and deb), built by `scripts/keyring.sh` with nfpm from
+`keyring/nfpm.yaml`, at the latest keyring version in state with the patch bumped (1.0.0 first),
+so retention keeps only the latest keyring. It installs every public key in
 `keys/`. It's published through the same publish step and default retention (no `repos.yaml`
 entry), exempt from admission, and recorded in state under
-`openchami-archive-keyring@<version>`. Built by the `keyring` workflow (manual, and on changes to
+`openchami-keyring@<version>`. Built by the `keyring` workflow (manual, and on changes to
 `keys/`).
 
 The README is the first stop for client setup: installing the keyring, the dnf `.repo` file, and
@@ -137,16 +133,17 @@ Parked on `seantronsen/wip/tests`.
 
 ### Integration suite
 
-Done: [integration-tests.md](integration-tests.md) covers usage, the tests, and the code
-conventions. Remaining:
+[integration-tests.md](integration-tests.md) covers usage, the tests, and the code conventions.
+Remaining:
 
-- S3: github.com runners can't reach a local gateway, so testing the distributor's upload needs
-  an internet-reachable test bucket (a free-tier S3-compatible service, or a public MinIO with
-  TLS) with credentials scoped to that bucket only. TODO: find a free tier. Until then the distro
-  tests check the published layout through a local versitygw only.
-- Release publisher check: its rejection case needs a `v*` tag pushed by someone other than the
-  allowed publisher. Not a second account or shared token (flag risk); buddy style (a real second
-  maintainer pushes the tag) or a GitHub App. Decide with the check itself.
+- TODO: S3 in the suite, as cases: a test bucket in settings, its credentials (scoped to that
+  bucket) set as the throwaway distributor's secrets, `target.s3` in the default config, and the
+  distro tests installing from the bucket's HTTPS URL instead of the local versitygw. Cover
+  prune's deletions and orphan reconcile against the bucket too. For client checks: bare
+  `debian:13` lacks `ca-certificates`, so apt can't fetch over HTTPS until it's installed.
+- TODO: archive key cases: the `keyring` workflow and installing the keyring with dnf and apt,
+  `rekey.yml` after a key switch, and both `check-keys` issues (expiring, switch due). All
+  implemented; tested locally only.
 - Flake resilience: GitHub-side failures (e.g. actions/download-artifact giving up after its
   retries) fail a test though the distributor recovers on the next poll. Options: retry flaky
   steps in the distributor; the suite re-dispatches one poll when a poll fails in a
@@ -207,6 +204,10 @@ Libs:
   poll; discuss.
 - `wait.sh`: `wait__check`'s 10 s retry sleep and its 3 tries are hardcoded; make them settings
   (`config.defaults.yaml`).
+- TODO, reconsider: a JSON Schema for the test config (`config.defaults.yaml` and user
+  overrides), as `config/repos.schema.json` does for the distributor. Not yet: the settings are
+  still fluid, `lib/config.sh` already checks every setting it reads, and it would add Python and
+  `check-jsonschema` to the host requirements (today only `yq` and `jq`).
 
 New, unnecessary but wanted:
 
@@ -220,23 +221,16 @@ New, unnecessary but wanted:
   vulnerabilities).
 
 Repo-wide: adopt github-actions' `Makefile.common` (simpler test runs, REUSE headers, the
-standard tooling). Waits for github-actions v4, and probably until after the keyring.
+standard tooling); probably after the keyring.
 
 ## Hosting
 
-- The S3 / domain publish target: implement the `target_*` functions in `lib.sh` (e.g. with
-  `aws s3`). Blocked on the hosting decision (provider, domain, account owner).
-- With the S3 target, add `target_list`, and have prune reconcile: list package paths on the
-  target (`rpm/packages/`, `deb/pool/`; never `keys/` or metadata), and remove any file state
-  doesn't list as `published`, metadata first. This covers files left behind by the escape hatch
-  (deleted state can't rediscover deleted releases) and by runs that died mid-write. It replaces
-  spec.md's "nothing has to list the publish target": every backend we can write to can be listed.
-  Safe because prune runs in the `poll` concurrency group, never alongside publish.
+- The production bucket: provider, domain, account owner (deployment.md).
 - Exact polling interval.
 
 ## Release publisher check
 
-Implemented (spec.md, Admit step 2). TODO:
+Remaining (the check itself is spec.md, Admit step 2):
 
 - The integration suite: add `publishers` to its default config; push a no-op tag workflow to
   the second service repo (crafted releases have no runs, so every one is rejected); have
@@ -256,6 +250,19 @@ the publisher check above). Then the testing-guide's presentation run as the dem
 
 ## Later
 
+- TODO, consider: drop the local directory target once S3 is proven, which simplifies every
+  `target_*` function. Blocked until the suite has an internet-reachable test bucket: its CI and
+  distro tests read the local target's artifacts.
+- TODO: read config in `scripts/` the way the integration suite does (`config__get` /
+  `settings__get`): one getter for every setting that needn't be an environment variable, no
+  defaults in code, a missing key is an error. Replaces the ad hoc `yq`/`jq` reads and the
+  exported `TARGET_S3_*` variables. A bigger edit; do it once the features are in.
+- TODO: trim the doc comments in `scripts/` (many are too verbose), during the cleanup.
+- TODO: use the `gh` CLI for every GitHub API call in `scripts/lib.sh` (curl wrapper, page loops,
+  asset downloads, issue helpers; about 30 lines). Paginate with `--paginate` plus per-page
+  `--jq` and `jq -s`, not `--slurp` (gh 2.48+; older gh, e.g. Debian's, lacks it).
+- TODO: build the suite's crafted packages (`ci/lib/crafted.sh`) with nfpm, as real releases do
+  through GoReleaser (about 30 lines; pinned nfpm binary in the tools container).
 - apk and pacman. Both can update their indexes without old packages (tested): pacman natively
   with `repo-add` / `repo-remove` (`--sign`); apk by merging `APKINDEX` stanzas by hand
   (`apk index --index` drops entries for absent packages), re-tarring, and signing with
@@ -269,8 +276,19 @@ the publisher check above). Then the testing-guide's presentation run as the dem
   releases of smd, bss, magellan, ochami, opaal, tokensmith, and release carry unsigned packages
   with no sidecars; the first polls reject each one (256 per poll, oldest first) and open an
   issue per release, until state covers them all. That's intended.
+- TODO: key `repos` in `config/repos.yaml` by repo name, like `publishers` (duplicates become a
+  parse error; `by_name` and the `select(.name == $repo)` lookups go away). Same pass: drop the
+  `tostring` and `ascii_upcase` the schema makes redundant (require uppercase fingerprints), and
+  allow uppercase in `allow` names (rpm permits them).
+- TODO: run `validate-config.yml` on `ubuntu-latest`, like every poll job.
+- TODO: refactor `scripts/prune.sh`: the decisions, the orphan reconcile, the metadata rewrite,
+  and the deletes are all inline; split them into small functions.
+- TODO: refactor `scripts/admit.sh`. It's the hardest script to read: long inline jq programs
+  (the name, ownership, and duplicate rules), mixed shell and jq state, and checks of very
+  different sizes in one file. Move the jq into `lib.jq` (or its own `.jq` file) and split the
+  checks into small functions of similar shape.
 - `releases_list` gets more expensive as releases accumulate (every poll lists every release);
-  see Order, item 12.
+  see Order, item 10.
 
 ## Possibly never
 

@@ -24,9 +24,8 @@ Parked on branches: the keepalive workflow on `seantronsen/wip/keepalive` and th
 `poll` runs on a schedule (every 10 minutes, though GitHub currently fires it only a few times a
 day), on pushes that change `config/repos.yaml`, and on `workflow_dispatch`. It needs the
 `MASTER_PUBLIC_ASC` and `MASTER_FPR` secrets (root public key and fingerprint).
-`ARCHIVE_GPG_KEY` (and `ARCHIVE_GPG_PASSPHRASE`) is optional: without it, every publish and prune
-job signs with its own throwaway key, so the result is for inspection only.
-
-The publish target is transient: each job's copy is uploaded as a
-`target-<publish|prune>-<format>` artifact. The variables are listed at the top of
-`scripts/lib.sh`.
+Publishing goes to the bucket in `config/repos.yaml`'s `target.s3`, with the
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` and `ARCHIVE_GPG_KEY` (and `ARCHIVE_GPG_PASSPHRASE`)
+secrets; bucket setup is in [docs/deployment.md](docs/deployment.md). Without `target`, each job
+publishes to a transient directory, uploaded as a `target-<publish|prune>-<format>` artifact, and
+an unset `ARCHIVE_GPG_KEY` means a throwaway key, so the result is for inspection only.
