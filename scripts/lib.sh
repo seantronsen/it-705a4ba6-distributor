@@ -202,6 +202,16 @@ target_ls() { # <dir>: file names directly in it
   find "$PUBLISH_DIR/$1" -maxdepth 1 -type f ! -name '*.tmp.*' -printf '%f\n'
 }
 
+target_find() { # <dir>: paths of every file under it, from the target root
+  if [[ -n $TARGET_S3_BUCKET ]]; then
+    s3 s3api list-objects-v2 --bucket "$TARGET_S3_BUCKET" --prefix "$1/" --output json \
+      | jq -r '(.Contents // [])[].Key'
+    return
+  fi
+  [[ -d $PUBLISH_DIR/$1 ]] || return 0
+  (cd "$PUBLISH_DIR" && find "$1" -type f ! -name '*.tmp.*')
+}
+
 # --- Archive key ------------------------------------------------------------------------------
 
 # Sets up a private GNUPGHOME holding the archive secret key. Sets ARCHIVE_FPR and ARCHIVE_PUB (the

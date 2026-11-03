@@ -4,8 +4,10 @@
 #   prune.sh <rpm|deb> <outdir>
 #
 # Decides, from state, which published packages to remove: those admitted with a denied repo key,
-# then the retention policy over the rest. Rewrites the repository metadata without them and
-# deletes their files. Writes <outdir>/prune-<format>.json for record.
+# then the retention policy over the rest; plus any package file on the target that state
+# doesn't list as published (left by a run that died mid-publish, or a state reset). Rewrites
+# the repository metadata without them and deletes their files. Writes
+# <outdir>/prune-<format>.json for record.
 source "$(dirname "$0")/lib.sh"
 source "$ROOT/scripts/lib-repo.sh"
 
@@ -34,13 +36,22 @@ jq -n --arg fmt "$fmt" --argjson pruned "$pruned" --argjson denied "$denied" '
    denied: $denied}' > "$delta"
 
 remove=$(jq -c -s 'add' <<< "$pruned $denied")
-if [[ $(jq length <<< "$remove") -eq 0 ]]; then
+
+# Orphans: package files on the target that state doesn't list as published.
+target_init
+if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
+mapfile -t orphans < <(comm -23 <(target_find "$pkgdir" | sort) <(jql -r --arg fmt "$fmt" '
+  include "lib"; published_packages[] | select(.format == $fmt)
+  | if $fmt == "rpm" then "rpm/packages/\(.filename)"
+    else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' <<< "$state" | sort))
+
+if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
   log "prune $fmt: nothing to remove"
   exit 0
 fi
-log "prune $fmt: $(jq length <<< "$pruned") by retention, $(jq length <<< "$denied") for a denied repo key"
+log "prune $fmt: $(jq length <<< "$pruned") by retention, $(jq length <<< "$denied") for a denied" \
+  "repo key, ${#orphans[@]} not in state"
 
-target_init
 archive_key_init
 
 work=$(mktemp -d)
@@ -48,6 +59,9 @@ excludes=$work/excludes
 while IFS=$'\t' read -r name filename; do
   if [[ $fmt == rpm ]]; then echo "$filename"; else rel=$(package_path deb "$name" "$filename"); echo "${rel#*/}"; fi
 done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove") > "$excludes"
+for f in "${orphans[@]}"; do
+  if [[ $fmt == rpm ]]; then echo "${f##*/}"; else echo "${f#deb/}"; fi
+done >> "$excludes"
 
 if [[ $fmt == rpm ]]; then
   meta=$(rpm_metadata "$work" "$work/new" "$excludes")
@@ -61,5 +75,6 @@ fi
 while IFS=$'\t' read -r name filename; do
   target_rm "$(package_path "$fmt" "$name" "$filename")"
 done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
+for f in "${orphans[@]}"; do target_rm "$f"; done
 
 log "prune $fmt: done ($TARGET)"
