@@ -55,14 +55,17 @@ Only `.rpm` and `.deb` files listed in `checksums.txt` are considered; everythin
 ## Repository layout
 
 ```
-config/repos.yaml          service repos, each with optional allow, deny, retain, keep-releases
+config/repos.yaml          publishers, and service repos with optional allow, deny, retain,
+                           keep-releases; every option documented in its comments
+config/repos.schema.json   its JSON Schema; config/requirements.txt pins check-jsonschema
 state/state.json           what has been published, pruned, skipped, or rejected
 scripts/                   discover.sh, admit.sh, publish.sh, prune.sh, record.sh
 scripts/lib.sh             shared helpers (config, state, GitHub API, target, archive key)
 scripts/lib-repo.sh        incremental rpm and apt metadata
 scripts/lib.jq             shared jq definitions (published set, denied packages, retention)
 .github/workflows/         poll.yml (schedule, config changes, dispatch); _discover.yml,
-                           _admit.yml, _publish.yml, _record.yml, _prune.yml (reusable stages)
+                           _admit.yml, _publish.yml, _record.yml, _prune.yml (reusable stages);
+                           validate-config.yml (PRs)
 ```
 
 `config/repos.yaml`: one entry per service repo. Only `name` is required; a bare entry just polls
@@ -70,6 +73,9 @@ the repo. Removing an entry stops polling that repo; its published packages stay
 default retention rules.
 
 ```yaml
+publishers:                   # keyed by GitHub user ID; without repos: every repo
+  60711680: {username: seantronsen}
+  12345678: {username: someone, repos: [OpenCHAMI/fru-tracker]}
 repos:
   - name: OpenCHAMI/smd
     keep-releases: ["1.4"]    # major.minor lines kept past EOL (quoted: unquoted 1.10 is 1.1)
@@ -103,8 +109,9 @@ prune:  prune (per format) -> record
   writes the target or state, so a run is never cancelled mid-write, two runs never rebuild the
   same metadata at once, and GitHub keeps at most one waiting run.
 - A waiting run starts on the commit it was queued on, which predates the state its predecessor
-  just committed. So poll's first job, `config`, resolves the latest `main` commit, and discover
-  and admit both check out that commit: the same state and config for both. Prune checks out
+  just committed. So poll's first job, `config`, resolves the latest `main` commit and validates
+  its config against the schema (a bad config fails the run, never rejects a release), and
+  discover and admit both check out that commit: the same state and config for both. Prune checks out
   the latest `main` itself, since it must also see this run's own record.
 - Every job has `timeout-minutes: 30`.
 - Jobs run on `ubuntu-latest` with its own tools (jq, curl, gpg, rpm, dpkg, mikefarah yq), with no
@@ -134,22 +141,26 @@ fails without recording anything, so the release stays first in the queue and th
 retries it.
 
 1. Download the four required sidecar files. Missing any of them: reject.
-2. Verify the trust chain and the `checksums.txt` signature with github-actions'
+2. Check the publisher: everyone who pushed the tag or ran (or re-ran) any of its push runs must
+   be in `publishers` and allowed for this repo; no push run at all also rejects. Every run
+   counts, since the API doesn't say which run published the release. Matched by user ID (a
+   login can be re-registered). Runs come from the public API, so `GITHUB_TOKEN` suffices.
+3. Verify the trust chain and the `checksums.txt` signature with github-actions'
    `scripts/gpg-verify-trust-chain.sh`, fetched from its raw URL pinned by commit SHA (constant
    in `lib.sh`, updated by a Renovate custom regex manager). Root key and fingerprint come from
    the `MASTER_PUBLIC_ASC` / `MASTER_FPR` org secrets; `REPO` is the release's repo, so the repo
    key must be certified as `<owner>/<repo> RPM Signing Key`. This covers the chain, the repo
    key's name, expiry and revocation, and the signature. The script returns the repo key's
    fingerprint.
-3. Reject if the repo key fingerprint is in the repo's `deny`, whatever its `since`.
-4. Download each `.rpm` / `.deb` listed in `checksums.txt` and check its hash.
-5. Read each package's metadata (`rpm -qp --qf`, `dpkg-deb -f`): name, version, arch. Packages for
+4. Reject if the repo key fingerprint is in the repo's `deny`, whatever its `since`.
+5. Download each `.rpm` / `.deb` listed in `checksums.txt` and check its hash.
+6. Read each package's metadata (`rpm -qp --qf`, `dpkg-deb -f`): name, version, arch. Packages for
    architectures outside scope (anything but `x86_64`/`aarch64`/`noarch` for rpm,
    `amd64`/`arm64`/`all` for deb) are ignored.
-6. Check versions. The version (without a deb revision) must be `major.minor.patch`. With a
+7. Check versions. The version (without a deb revision) must be `major.minor.patch`. With a
    prerelease part (`~rc`, `-rc1`, ...): record the release as `skipped`, no issue. Anything else:
    reject.
-7. Check each package:
+8. Check each package:
    - Name: `<repo>` or `<repo>-*` (repo name lowercased), or in the repo's `allow`, and not
      another repo's: a name matching a longer configured repo name's rule (`smd-tools` when both
      `smd` and `smd-tools` are configured) belongs to that repo, and a name already published by
@@ -157,7 +168,7 @@ retries it.
    - Two packages in the release with the same format, name, version, and arch: reject.
    - The same format, name, version, and arch already in state (published or pruned), whatever
      its hash: reject. That's a re-tag of an existing version; fixes ship as new patch versions.
-8. Upload `result.json` (status, reasons, repo key, and the admitted packages: name, version,
+9. Upload `result.json` (status, reasons, repo key, and the admitted packages: name, version,
    arch, format, filename, sha256) plus the package files as the job's artifact. The sha256 is the
    one from `checksums.txt`, before archive signing changes the rpm. A release left with nothing
    to publish (only ignored packages) is still recorded as `published` with no packages.
@@ -328,8 +339,10 @@ archive key); only future admission changes. Handled manually.
 ## Security
 
 - Only an allowlist of maintainers has any write access; everyone else is read-only.
-- No workflow triggers on `pull_request` or `pull_request_target`, so a PR can never reach a
-  secret.
+- No workflow that holds a secret or writes anything triggers on `pull_request` or
+  `pull_request_target`, so a PR can never reach a secret. The one PR workflow,
+  `validate-config.yml`, is read-only with no secrets; make it a required status check on `main`
+  so only a valid config merges.
 - The poller bot has a bypass on the protected default branch for state commits. A bypass can't
   be scoped to one file; the posture is to be revisited.
 - Third-party actions pinned by SHA; the trust-chain script pinned by commit SHA in its URL.
@@ -340,8 +353,8 @@ archive key); only future admission changes. Handled manually.
   any other. So only maintainers may create, move, or delete `v*` tags: an org-wide tag ruleset
   for `v*` (OpenCHAMI's plan supports org rulesets) is a prerequisite for adding a repo to
   `config/repos.yaml`. A tag-only `release` environment for the repo key secret is the
-  complement, so non-tag runs can't reach the key. A planned admit check (spec-deferred.md,
-  Release publisher check) backs this up for the archive.
+  complement, so non-tag runs can't reach the key. Admit's publisher check backs this up for the
+  archive.
 - The archive key (`ARCHIVE_GPG_KEY`) is available only to publish and prune.
 
 ## Phases

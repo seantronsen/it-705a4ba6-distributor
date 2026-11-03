@@ -11,8 +11,9 @@ repositories signed with the OpenCHAMI archive key.
 - `.github/workflows/`: `poll.yml` resolves the commit to read, then calls one reusable workflow
   per stage (`_discover.yml`, `_admit.yml`, `_publish.yml`, `_record.yml`, `_prune.yml`). Jobs
   run on `ubuntu-latest`; publish and prune install the few tools it lacks.
-- `config/repos.yaml`: the service repos to poll, with their `allow`, `deny`, `retain`, and
-  `keep-releases`.
+- `config/repos.yaml`: who may publish, and the service repos to poll with their `allow`, `deny`,
+  `retain`, and `keep-releases`; documented in its comments. `config/repos.schema.json` validates
+  it, with the version of `check-jsonschema` pinned in `config/requirements.txt`.
 - `state/state.json`: every release and package processed, and what happened to it.
 
 Parked on branches: archive key rotation and the keyring package on

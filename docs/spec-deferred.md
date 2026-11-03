@@ -8,7 +8,7 @@ reconciling with the reworked prototype.
 ## Order
 
 1. Integration suite (Testing).
-2. Release publisher check.
+2. Release publisher check (done; suite TODO).
 3. Gap: the same version in two releases of one batch isn't caught.
 4. Gap: `_publish.yml` hardcodes `poll-admit-*` (the keyring needs another input).
 5. Tentative: stop paging releases once discover reaches ones already in state.
@@ -237,19 +237,14 @@ standard tooling). Waits for github-actions v4, and probably until after the key
 
 ## Release publisher check
 
-A `v*` tag ruleset on every service repo (spec.md, Security) is easy to miss on one repo. Admit
-can enforce the rule for the archive itself, as a backstop (the ruleset is still what keeps the
-repo key from signing a non-maintainer's tag at all): find who pushed the tag that triggered the
-release (the release is created by the Actions bot, so take the actor of the release workflow
-run for that tag), and reject the release unless that person has maintain or admin permission
-on the service repo.
+Implemented (spec.md, Admit step 2). TODO:
 
-- Use the run's actor (who pushed), not the commit author: a commit's author field is whatever
-  the committer typed.
-- Reading another repo's runs and collaborator permissions needs a token beyond this repo's
-  `GITHUB_TOKEN` (e.g. an org GitHub App with read access); decide alongside the trigger
-  mechanism, which needs one too.
-- Rejection reason names the actor and their permission; same issue flow as other rejections.
+- The integration suite: add `publishers` to its default config; push a no-op tag workflow to
+  the second service repo (crafted releases have no runs, so every one is rejected); have
+  `crafted__release` wait for the tag's push run before polling. Then cases for an allowed
+  publisher, one not listed, and a lead limited to another repo. Batched with the other test
+  work.
+- Make `validate-config` a required status check on `main` (repo setting).
 
 ## Presentation
 
