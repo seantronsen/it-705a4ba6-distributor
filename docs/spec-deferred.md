@@ -7,14 +7,15 @@ reconciling with the reworked prototype.
 
 ## Order
 
-1. Adopt github-actions' `Makefile.common`.
-2. Unit tests: rework `seantronsen/wip/tests`.
-3. Test redesign: integration and unit together, per the review notes (Testing).
-4. Revise the whole repo, workflows through scripts (not tests): the cleanup TODOs under Later.
-5. Presentation.
-6. Keepalive workflow.
-7. Trigger mechanism (cron fires only a few times a day).
-8. Tentative: stop paging releases once discover reaches ones already in state.
+1. Integration tests: the next round, per the review notes (Testing), including the S3 and archive
+   key cases.
+2. Unit tests: rework `seantronsen/wip/tests`, after the integration round.
+3. Revise the whole repo, workflows through scripts (not tests): the cleanup TODOs under Later.
+4. Presentation.
+5. Keepalive workflow.
+6. Trigger mechanism (cron fires only a few times a day).
+7. Tentative: stop paging releases once discover reaches ones already in state.
+8. Maybe: adopt github-actions' `Makefile.common` (mostly for test targets; little else applies).
 
 Deferred, possibly indefinitely: state on its own branch, apk and pacman, per-distro-version
 repositories, the notifier.
@@ -130,6 +131,11 @@ Parked on `seantronsen/wip/tests`.
 - The branch still relies on the old phased admit, the vendored `verify-chain.sh`, and the
   local-run tooling (`run-local.sh`, `in-tools.sh`); rework it against the new admit, which
   fetches the trust-chain script.
+- TODO (design for testability, with the repo revision): move the inline jq blobs out of the
+  scripts into named defs, so each script reads top-down and each def tests as a pure function
+  on fixture JSON. Split `lib.jq` by domain (`version`, `config`, `state`, `publishers`, `deny`,
+  `retention`), use `import "x" as x;`, keep a per-script module only for logic nothing else
+  uses, and promote a def once a second caller needs it. Consider the same split for `lib.sh`.
 
 ### Integration suite
 
