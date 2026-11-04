@@ -26,10 +26,8 @@ for d in "$@"; do
          | . + {release: $k, path: "\($d)/\(.path)"}]' <<< "$new")
 done
 
-jq -n --arg fmt "$fmt" --argjson new "$new" \
-  '{format: $fmt, patches: [$new[] | {release, filename, status: "published"}]}' > "$delta"
-
 if [[ $(jq length <<< "$new") -eq 0 ]]; then
+  jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
   log "publish $fmt: nothing new"
   exit 0
 fi
@@ -37,6 +35,11 @@ log "publish $fmt: $(jq length <<< "$new") new"
 
 target_init
 archive_key_init
+
+# rpms record the archive key that signed them, so rekey knows what to re-sign.
+jq -n --arg fmt "$fmt" --arg fpr "$ARCHIVE_FPR" --argjson new "$new" '{format: $fmt, patches: [
+  $new[] | {release, filename, status: "published"}
+  + (if $fmt == "rpm" then {signed_with: $fpr} else {} end)]}' > "$delta"
 
 work=$(mktemp -d)
 newdir=$work/new

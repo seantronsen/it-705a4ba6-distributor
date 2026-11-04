@@ -120,6 +120,17 @@ issue_ensure() { # <title> <label> <body>
   issue_create "$title" "$label" "$body"
 }
 
+# Close the open issue with this title and label, if any.
+issue_close() { # <title> <label> <comment>
+  local number
+  number=$(gh_api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(uri "$2")&per_page=100" \
+    | jq -r --arg t "$1" '[.[] | select(.title == $t)][0].number // empty')
+  [[ -n $number ]] || return 0
+  gh_api "repos/$GITHUB_REPOSITORY/issues/$number/comments" -X POST \
+    --data "$(jq -n --arg b "$3" '{body: $b}')" > /dev/null
+  gh_api "repos/$GITHUB_REPOSITORY/issues/$number" -X PATCH --data '{"state": "closed"}' > /dev/null
+}
+
 issue_create() { # <title> <label> <body>
   gh_api "repos/$GITHUB_REPOSITORY/issues" -X POST \
     --data "$(jq -n --arg t "$1" --arg l "$2" --arg b "$3" '{title: $t, body: $b, labels: [$l]}')" > /dev/null
@@ -245,6 +256,21 @@ archive_key_init() {
   ARCHIVE_PUB=$GNUPGHOME/archive-public.asc
   gpg --batch --armor --export "$ARCHIVE_FPR" > "$ARCHIVE_PUB"
   export ARCHIVE_FPR ARCHIVE_PUB
+
+  # A real key must be the committed one (keys/archive.asc), e.g. not half through a switch.
+  if [[ -n ${ARCHIVE_GPG_KEY:-} && -f $ROOT/keys/archive.asc ]]; then
+    [[ $(key_file_fpr "$ROOT/keys/archive.asc") == "$ARCHIVE_FPR" ]] \
+      || die "ARCHIVE_GPG_KEY ($ARCHIVE_FPR) isn't keys/archive.asc"
+  fi
+}
+
+key_file_fpr() { # <armored public key file>: its primary key's fingerprint
+  gpg --batch --with-colons --show-keys "$1" 2> /dev/null | awk -F: '$1=="fpr" {print $10; exit}'
+}
+
+rpm_resign() { # <rpm>...: replaces any signature with the archive key's
+  rpmsign --delsign "$@" > /dev/null
+  rpm_sign "$@"
 }
 
 rpm_sign() { # <rpm>...

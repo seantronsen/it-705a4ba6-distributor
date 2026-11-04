@@ -1,0 +1,75 @@
+# Builds openchami-keyring from keys/ and publishes it like an admitted release (spec-deferred.md,
+# Keyring package).
+name: keyring
+
+on:
+  push:
+    branches: [main]
+    paths: ['keys/**']
+  workflow_dispatch:
+
+# Writes the target and state, like poll.
+concurrency:
+  group: poll
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      NFPM_VERSION: 2.48.0
+      NFPM_SHA256: 6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install nfpm
+        run: |
+          set -euo pipefail
+          tgz=nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz
+          curl -fsSL -o "$RUNNER_TEMP/$tgz" "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/$tgz"
+          echo "$NFPM_SHA256  $RUNNER_TEMP/$tgz" | sha256sum -c --quiet
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/$tgz" -C "$RUNNER_TEMP/bin" nfpm
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Build the keyring
+        env:
+          ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
+          ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+        run: PUBLISH_DIR=$RUNNER_TEMP/target scripts/keyring.sh admit
+      - name: Upload admission
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: keyring-admit-0
+          path: |
+            admit/result.json
+            admit/files/
+          retention-days: 7
+
+  publish:
+    needs: build
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_publish.yml
+    with:
+      prefix: keyring
+    secrets:
+      ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
+      ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  record:
+    needs: publish
+    permissions:
+      contents: write   # commit state
+      issues: write
+    uses: ./.github/workflows/_record.yml
+    with:
+      artifacts: keyring-*

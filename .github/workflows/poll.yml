@@ -46,8 +46,31 @@ jobs:
           pipx run --spec "$(grep '^check-jsonschema==' config/requirements.txt)" check-jsonschema \
             --schemafile config/repos.schema.json config/repos.yaml
 
-  discover:
+  # Fails the run on an archive key problem (expiring, or not keys/archive.asc) before anything is
+  # published, and keeps the key issues in step.
+  keys:
     needs: config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write     # archive key issues
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.config.outputs.sha }}
+          fetch-depth: 0   # check-keys dates keys/archive-next.asc from its history
+          persist-credentials: false
+      - name: Check the archive key
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
+          ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
+        run: PUBLISH_DIR=$RUNNER_TEMP/target scripts/check-keys.sh
+
+  discover:
+    needs: [config, keys]
     permissions:
       contents: read
     uses: ./.github/workflows/_discover.yml

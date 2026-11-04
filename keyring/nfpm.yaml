@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/static/schema.json
+# openchami-keyring: every public key in keys/, for dnf and apt. Built by scripts/keyring.sh,
+# which sets KEYRING_VERSION and writes keyring/build/keys.asc (all the keys, armored).
+# nfpm expands variables in version but not in contents paths.
+name: openchami-keyring
+arch: all
+platform: linux
+version: ${KEYRING_VERSION}
+release: "1"
+maintainer: OpenCHAMI <info@openchami.org>
+description: OpenCHAMI archive signing keys for the OpenCHAMI dnf and apt repositories.
+homepage: https://www.openchami.org
+license: MIT
+section: misc
+contents:
+  - src: keyring/build/keys.asc
+    dst: /etc/pki/rpm-gpg/RPM-GPG-KEY-openchami
+    packager: rpm
+  - src: keyring/build/keys.asc
+    dst: /usr/share/keyrings/openchami-keyring.asc
+    packager: deb

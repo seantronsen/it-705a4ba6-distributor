@@ -16,9 +16,8 @@ repositories signed with the OpenCHAMI archive key.
   it, with the version of `check-jsonschema` pinned in `config/requirements.txt`.
 - `state/state.json`: every release and package processed, and what happened to it.
 
-Parked on branches: archive key rotation and the keyring package on
-`seantronsen/wip/rekey-keyring`, the keepalive workflow on `seantronsen/wip/keepalive`, and the
-tests on `seantronsen/wip/tests`.
+Parked on branches: the keepalive workflow on `seantronsen/wip/keepalive` and the tests on
+`seantronsen/wip/tests`.
 
 ## Running
 

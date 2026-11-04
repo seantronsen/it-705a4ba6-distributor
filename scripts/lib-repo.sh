@@ -124,7 +124,17 @@ apt_metadata_write() { # <dir holding dists/>
   done
 }
 
-# Publishes the archive public key as keys/archive.asc.
+# Publishes keys/ (archive.asc, and during a rotation or after a compromise archive-next.asc,
+# archive-previous.asc, revoked-<fpr>.asc) and removes keys no longer there. Without a committed
+# keys/archive.asc (throwaway key), publishes the archive public key alone.
 keys_write() {
-  target_put "$ARCHIVE_PUB" keys/archive.asc
+  local f
+  if [[ ! -f $ROOT/keys/archive.asc ]]; then
+    target_put "$ARCHIVE_PUB" keys/archive.asc
+    return
+  fi
+  for f in "$ROOT"/keys/*.asc; do target_put "$f" "keys/${f##*/}"; done
+  for f in $(target_ls keys); do
+    [[ -e $ROOT/keys/$f ]] || target_rm "keys/$f"
+  done
 }
