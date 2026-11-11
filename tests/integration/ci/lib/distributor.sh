@@ -13,12 +13,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/poll.sh"
 
 ################################################################################
-# The default config: the testbed allowed its two packages, the second repo nothing extra.
+# The publishers block: the gh user, who also pushes the tags (over the SSH agent).
+# Outputs:
+#   config/repos.yaml lines on stdout.
+################################################################################
+distributor__publishers() {
+  gh api user -q '"publishers:\n  \"\(.id)\": {username: \(.login)}"'
+}
+
+################################################################################
+# The default config: the gh user may publish, the testbed is allowed its two packages, the
+# second repo nothing extra.
 # Outputs:
 #   config/repos.yaml content on stdout.
 ################################################################################
 distributor__default_config() {
   cat << EOF
+$(distributor__publishers)
 repos:
   - name: $(suite__testbed_repo)
     allow: [testbed, testbed-quadlet]

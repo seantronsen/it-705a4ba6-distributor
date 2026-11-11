@@ -25,6 +25,7 @@ setup() {
   keys__set_archive_secret garbage
   # Denying the key gives prune something to remove.
   run=$(distributor__push_config << EOF
+$(distributor__publishers)
 repos:
   - name: $(suite__testbed_repo)
     allow: [testbed, testbed-quadlet]

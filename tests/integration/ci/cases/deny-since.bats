@@ -24,6 +24,7 @@ setup() {
   poll__run > /dev/null
   since=$(state__get | jq -r --arg k "$repo@v1.1.0" '.[$k].at')
   distributor__push_config > /dev/null << EOF
+$(distributor__publishers)
 repos:
   - name: $(suite__testbed_repo)
     allow: [testbed, testbed-quadlet]

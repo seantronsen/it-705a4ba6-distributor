@@ -22,6 +22,7 @@ setup() {
   crafted__release "$repo" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
   distributor__push_config > /dev/null << EOF
+$(distributor__publishers)
 repos:
   - name: $(suite__testbed_repo)
     allow: [testbed, testbed-quadlet]

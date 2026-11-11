@@ -49,7 +49,7 @@ lifecycle__guard() {
 ################################################################################
 # Prepares the repos for a run: a new key chain and secrets, everything wiped (runs too), and
 # the local checkouts force-pushed. The second service repo only holds crafted releases, so it
-# gets just the marker.
+# gets just the marker and the tag workflow.
 # Returns:
 #   0, or 1 when any step failed.
 ################################################################################
@@ -68,6 +68,7 @@ lifecycle__setup_suite() {
     return 1
   fi
   echo distributor-it > "$dir/$(suite__marker)"
+  git__add_tag_workflow "$dir"
   git__commit "$dir" "it: marker" || return 1
   git__push_main "$dir" "$(suite__service2_repo)" --force || return 1
   distributor__seed

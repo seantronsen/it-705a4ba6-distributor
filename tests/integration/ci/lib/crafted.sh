@@ -8,7 +8,9 @@ _IT_CRAFTED_SH=1
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/git.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/keys.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/wait.sh"
 
 ################################################################################
 # Builds a minimal arch-independent deb.
@@ -97,20 +99,38 @@ crafted__sign() {
 }
 
 ################################################################################
+# Pushes a tag on main over git, as a maintainer would, and waits for its push run (the tag
+# workflow): the distributor's publisher check reads the run's actor.
+# Arguments:
+#   owner/name, tag.
+# Returns:
+#   0, or 1 when the push failed or no run started.
+################################################################################
+crafted__push_tag() {
+  local dir
+  dir=$(mktemp -d)
+  git__clone "$1" "$dir/repo" || return 1
+  git__push_tag "$dir/repo" "$1" "$2" || return 1
+  wait__until "$1 $2: push run" github__has_push_run "$1" "$2"
+}
+
+################################################################################
 # Publishes a release of crafted packages: for each spec, a deb and an rpm.
 # Arguments:
 #   owner/name, tag, then options, then package specs ("name version [revision]").
-#   Options: --prerelease (a GitHub prerelease), --foreign (signed by an uncertified key).
+#   Options: --prerelease (a GitHub prerelease), --foreign (signed by an uncertified key),
+#   --no-push (the release creates the tag: no push run).
 # Returns:
 #   0, or 1 when building, signing, or the release failed.
 ################################################################################
 crafted__release() {
-  local repo=$1 tag=$2 dir spec sign_as='' gh_opts=()
+  local repo=$1 tag=$2 dir spec sign_as='' push=true gh_opts=()
   shift 2
   while [[ ${1:-} == --* ]]; do
     case $1 in
       --prerelease) gh_opts+=(--prerelease) ;;
       --foreign) sign_as=foreign ;;
+      --no-push) push=false ;;
       *)
         log__error "unknown option $1"
         return 1
@@ -126,6 +146,7 @@ crafted__release() {
     crafted__rpm "$dir" $spec || return 1
   done
   crafted__sign "$dir" "$repo" ${sign_as:+"$sign_as"} || return 1
+  if $push; then crafted__push_tag "$repo" "$tag" || return 1; fi
   github__release_create "$repo" "$tag" "${gh_opts[@]}" "$dir"/* || return 1
   log__info "released $repo $tag ($*)"
 }
@@ -144,6 +165,7 @@ crafted__copy_release() {
     log__error "can't download $1 $2"
     return 1
   fi
+  crafted__push_tag "$1" "$3" || return 1
   github__release_create "$1" "$3" "$dir"/* || return 1
   log__info "copied $1 $2 to $3"
 }

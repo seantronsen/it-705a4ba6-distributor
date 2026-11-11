@@ -69,7 +69,7 @@ keys__certify() {
 
 ################################################################################
 # Creates the key chain and records each fingerprint (see keys__fpr). Repo keys outlive
-# gpg-sign-artifacts' 30-day expiry check.
+# gpg-sign-artifacts' 30-day expiry check, and the archive key check-keys'.
 # Returns:
 #   0, or 1 when a key couldn't be made.
 ################################################################################
@@ -80,7 +80,7 @@ keys__create() {
   root=$(keys__new 'distributor-it root <it-root@invalid>' ed25519 cert 7d) || return 1
   testbed=$(keys__new "$(suite__testbed_repo) RPM Signing Key" ed25519 cert 60d) || return 1
   service2=$(keys__new "$(suite__service2_repo) RPM Signing Key" ed25519 cert 60d) || return 1
-  archive=$(keys__new 'distributor-it archive <it-archive@invalid>' rsa3072 sign 7d) || return 1
+  archive=$(keys__new 'distributor-it archive <it-archive@invalid>' rsa3072 sign 60d) || return 1
   keys__certify "$root" "$testbed" || return 1
   keys__certify "$root" "$service2" || return 1
   echo "$root" > "$dir/keys/root.fpr"

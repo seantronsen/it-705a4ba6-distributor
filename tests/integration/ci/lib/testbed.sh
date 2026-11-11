@@ -11,7 +11,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/git.sh"
 
 ################################################################################
 # Pushes the local testbed checkout (a copy at /src/testbed) to the throwaway repo, with its
-# images renamed into the owner's GHCR namespace and the marker.
+# images renamed into the owner's GHCR namespace, the marker, and the tag workflow.
 # Returns:
 #   0, or 1 when the push failed.
 ################################################################################
@@ -31,6 +31,7 @@ testbed__seed() {
     return 1
   fi
   echo distributor-it > "$dir/repo/$(suite__marker)"
+  git__add_tag_workflow "$dir/repo"
   git__commit "$dir/repo" "it: seed" || return 1
   git__push_main "$dir/repo" "$repo" --force
 }

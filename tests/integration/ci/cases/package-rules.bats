@@ -33,6 +33,7 @@ outcome() {
   if [[ $me == "$(suite__repo_name "$testbed")"-* ]]; then longer=true; fi
 
   distributor__push_config > /dev/null << EOF
+$(distributor__publishers)
 repos:
   - name: $testbed
     allow: [testbed, testbed-quadlet, it-shared, it-twice]
@@ -66,6 +67,7 @@ EOF
 
   # Moving it-shared to the second repo's allow doesn't hand it over: the testbed published it.
   distributor__push_config > /dev/null << EOF
+$(distributor__publishers)
 repos:
   - name: $testbed
     allow: [testbed, testbed-quadlet, it-twice]

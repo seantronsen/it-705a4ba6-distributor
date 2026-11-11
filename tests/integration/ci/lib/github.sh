@@ -84,6 +84,17 @@ github__jobs_concluded() {
 }
 
 ################################################################################
+# Whether a tag push has a workflow run yet.
+# Arguments:
+#   owner/name, tag.
+# Returns:
+#   0 when it has, 1 otherwise.
+################################################################################
+github__has_push_run() {
+  [[ $(gh api "repos/$1/actions/runs?event=push&branch=$2" -q '.workflow_runs | length') -gt 0 ]]
+}
+
+################################################################################
 # Creates a release, and with it its tag on main.
 # Arguments:
 #   owner/name, tag, then options for gh release create (e.g. --prerelease) and files.

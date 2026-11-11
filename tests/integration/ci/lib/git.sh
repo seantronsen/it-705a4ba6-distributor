@@ -60,6 +60,28 @@ git__push_main() {
 }
 
 ################################################################################
+# Adds a workflow that runs on every tag push but no-run-*, so the distributor's publisher check
+# finds a push run (and its actor) for a tag.
+# Arguments:
+#   Directory.
+################################################################################
+git__add_tag_workflow() {
+  mkdir -p "$1/.github/workflows"
+  cat > "$1/.github/workflows/it-tag.yml" << 'EOF'
+name: it-tag
+on:
+  push:
+    tags-ignore: ['no-run-*']
+permissions: {}
+jobs:
+  tag:
+    runs-on: ubuntu-slim
+    steps:
+      - run: 'true'
+EOF
+}
+
+################################################################################
 # Pushes a tag on a working tree's HEAD.
 # Arguments:
 #   Directory, owner/name, tag.
