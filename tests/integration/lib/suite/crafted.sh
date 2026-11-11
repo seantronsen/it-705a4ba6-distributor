@@ -5,10 +5,12 @@
 [[ -n ${_IT_CRAFTED_SH:-} ]] && return 0
 _IT_CRAFTED_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../github.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../git.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/keys.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../wait.sh"
 
 ################################################################################
 # Builds a minimal arch-independent deb.
@@ -71,18 +73,19 @@ EOF
 # Writes checksums.txt for a directory's packages and signs it the way gpg-sign-artifacts
 # does: a 1-day signing key, certified by the repo's key, plus the three public keys.
 # Arguments:
-#   Directory, owner/name, "foreign" to leave the signing key uncertified (optional).
+#   Directory, repo role, "foreign" to leave the signing key uncertified (optional).
 # Returns:
 #   0, or 1 when signing failed.
 ################################################################################
 crafted__sign() {
-  local dir=$1 repo=$2 role signing
-  if [[ $repo == "$(suite__testbed_repo)" ]]; then role=testbed; else role=service2; fi
+  local dir=$1 role=$2 repo signing
+  repo=$(settings__get ".repos.$role.remote") || return 1
   if ! (cd "$dir" && sha256sum -- *.rpm *.deb > checksums.txt); then
     log__error "can't checksum $dir"
     return 1
   fi
-  signing=$(keys__new "$repo Release (distributor-it) <it@invalid>" ed25519 sign 1d) || return 1
+  signing=$(keys__new "$repo Release (distributor-it) <it@invalid>" \
+    "$(settings__get .keys.algorithm_attestation)" sign 1d) || return 1
   if [[ ${3:-} != foreign ]]; then
     keys__certify "$(keys__fpr "$role")" "$signing" || return 1
   fi
@@ -97,20 +100,39 @@ crafted__sign() {
 }
 
 ################################################################################
+# Pushes a tag on main over git, as a maintainer would, and waits for its push run (the
+# distributor's publisher check reads its actor).
+# Arguments:
+#   Repo path (owner/name), tag.
+# Returns:
+#   0, or 1 when the push failed or no run started.
+################################################################################
+crafted__push_tag() {
+  local dir
+  dir=$(mktemp -d)
+  git__clone "$1" "$dir/repo" || return 1
+  git__push_tag "$dir/repo" "$1" "$2" || return 1
+  wait__until "$1 $2: push run" github__has_push_run "$1" "$2"
+}
+
+################################################################################
 # Publishes a release of crafted packages: for each spec, a deb and an rpm.
 # Arguments:
-#   owner/name, tag, then options, then package specs ("name version [revision]").
-#   Options: --prerelease (a GitHub prerelease), --foreign (signed by an uncertified key).
+#   Repo role, tag, then options, then package specs ("name version [revision]").
+#   Options: --prerelease (a GitHub prerelease), --foreign (signed by an uncertified key),
+#   --no-push (the release creates the tag: no push run).
 # Returns:
 #   0, or 1 when building, signing, or the release failed.
 ################################################################################
 crafted__release() {
-  local repo=$1 tag=$2 dir spec sign_as='' gh_opts=()
+  local role=$1 tag=$2 repo dir spec sign_as='' push=true gh_opts=()
   shift 2
+  repo=$(settings__get ".repos.$role.remote") || return 1
   while [[ ${1:-} == --* ]]; do
     case $1 in
       --prerelease) gh_opts+=(--prerelease) ;;
       --foreign) sign_as=foreign ;;
+      --no-push) push=false ;;
       *)
         log__error "unknown option $1"
         return 1
@@ -125,7 +147,8 @@ crafted__release() {
     # shellcheck disable=SC2086
     crafted__rpm "$dir" $spec || return 1
   done
-  crafted__sign "$dir" "$repo" ${sign_as:+"$sign_as"} || return 1
+  crafted__sign "$dir" "$role" ${sign_as:+"$sign_as"} || return 1
+  if $push; then crafted__push_tag "$repo" "$tag" || return 1; fi
   github__release_create "$repo" "$tag" "${gh_opts[@]}" "$dir"/* || return 1
   log__info "released $repo $tag ($*)"
 }
@@ -133,17 +156,19 @@ crafted__release() {
 ################################################################################
 # Copies a release's assets to a new release on the same repo (a retag).
 # Arguments:
-#   owner/name, existing tag, new tag.
+#   Repo role, existing tag, new tag.
 # Returns:
 #   0, or 1 when the download or the release failed.
 ################################################################################
 crafted__copy_release() {
-  local dir
+  local repo dir
+  repo=$(settings__get ".repos.$1.remote") || return 1
   dir=$(mktemp -d)
-  if ! gh release download "$2" -R "$1" -D "$dir"; then
-    log__error "can't download $1 $2"
+  if ! gh release download "$2" -R "$repo" -D "$dir"; then
+    log__error "can't download $repo $2"
     return 1
   fi
-  github__release_create "$1" "$3" "$dir"/* || return 1
-  log__info "copied $1 $2 to $3"
+  crafted__push_tag "$repo" "$3" || return 1
+  github__release_create "$repo" "$3" "$dir"/* || return 1
+  log__info "copied $repo $2 to $3"
 }

@@ -11,9 +11,8 @@
 # privileges, and anything those containers can reach. Rootless podman is required (docker's
 # socket is root's). See docs/integration-tests.md.
 #
-# Each test file runs its CI stage first (e.g. ci/cases/real-build.bats, on the throwaway repos),
-# then one sibling container per distro. Logs go to stderr; the results (TAP) go to stdout and to
-# <output_dir>/<run id>/report.tap.
+# Each test file runs its CI stage first, then one sibling container per distro. Logs go to
+# stderr; results (TAP) to stdout and <output_dir>/<run id>/report.tap.
 #
 # Settings: config.defaults.yaml, overridden by ~/.config/distributor-it/config.yaml.
 set -uo pipefail

@@ -6,8 +6,7 @@
 _IT_ENGINE_SH=1
 
 ################################################################################
-# Runs a transient container: removed on exit, a minimal init as PID 1 (so signals like Ctrl-C
-# reach the command), SELinux relabeling off (mounts are shared with the host).
+# Runs a transient container: removed on exit, with an init as PID 1, SELinux relabeling off.
 # Globals:
 #   IT_ENGINE: the engine command (podman, docker, or podman-remote)
 # Arguments:
@@ -16,5 +15,7 @@ _IT_ENGINE_SH=1
 #   The container's exit status.
 ################################################################################
 engine__run() {
+  # The init passes signals like Ctrl-C on to the command; mounts are shared with the host, so
+  # they're never relabeled.
   "$IT_ENGINE" run --rm --init --security-opt label=disable "$@"
 }

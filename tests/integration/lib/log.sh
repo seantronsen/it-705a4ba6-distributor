@@ -6,18 +6,28 @@
 _IT_LOG_SH=1
 
 ################################################################################
-# Writes one log line. Inside bats, stderr is captured per test, so run-in-container.sh opens a
-# descriptor to the real stderr before starting bats and names it in IT_LOG_FD.
+# Writes one log line at a level.
 # Globals:
-#   IT_LOG_FD (optional), BATS_TEST_DESCRIPTION (set by bats inside a test)
+#   IT_LOG_FD, BATS_TEST_DESCRIPTION
+# Arguments:
+#   Level (INFO, ERROR, FATAL), then message words.
+# Outputs:
+#   "[HH:MM:SS] <LEVEL> <test>: <message>" on IT_LOG_FD, or stderr.
+################################################################################
+log__base() {
+  local level=$1 tag=${BATS_TEST_DESCRIPTION:+$BATS_TEST_DESCRIPTION: }
+  shift
+  # Inside bats, stderr is captured per test: run-in-container.sh opens IT_LOG_FD on the real one.
+  TZ=UTC printf '[%(%H:%M:%S)T] %s %s%s\n' -1 "$level" "$tag" "$*" >&"${IT_LOG_FD:-2}"
+}
+
+################################################################################
+# Logs progress.
 # Arguments:
 #   Message words.
-# Outputs:
-#   "[HH:MM:SS] <test>: <message>" on IT_LOG_FD, or stderr.
 ################################################################################
 log__info() {
-  local tag=${BATS_TEST_DESCRIPTION:+$BATS_TEST_DESCRIPTION: }
-  TZ=UTC printf '[%(%H:%M:%S)T] %s%s\n' -1 "$tag" "$*" >&"${IT_LOG_FD:-2}"
+  log__base INFO "$@"
 }
 
 ################################################################################
@@ -26,7 +36,7 @@ log__info() {
 #   Message words.
 ################################################################################
 log__error() {
-  log__info "error: ${FUNCNAME[1]:-main}: $*"
+  log__base ERROR "${FUNCNAME[1]:-main}: $*"
 }
 
 ################################################################################
@@ -35,6 +45,6 @@ log__error() {
 #   Message words.
 ################################################################################
 log__fatal() {
-  log__info "fatal: $*"
+  log__base FATAL "$*"
   exit 1
 }

@@ -59,17 +59,16 @@ launch__check_agent() {
 # Returns:
 #   0 when it does, 1 when it doesn't or isn't installed.
 ################################################################################
-launch__rootless_podman() {
+launch__is_rootless_podman() {
   command -v podman > /dev/null &&
     [[ $(podman info --format '{{.Host.Security.Rootless}}' 2> /dev/null) == true ]]
 }
 
 ################################################################################
 # Picks the container engine: the configured one, else rootless podman, podman, or docker, the
-# first installed. A suite that gets the engine's socket needs rootless podman: the socket lets
-# a container start containers as whoever runs the engine, and docker's is root's.
+# first installed. A suite that gets the engine's socket needs rootless podman.
 # Arguments:
-#   "socket" when the suite gets the engine's socket (optional).
+#   "socket" when the suite gets the engine's socket.
 # Outputs:
 #   podman or docker on stdout.
 # Returns:
@@ -77,13 +76,13 @@ launch__rootless_podman() {
 ################################################################################
 launch__engine() {
   local engine=""
-  if config__has .engine; then
-    engine=$(config__get .engine) || return 1
+  if config__has .containers.engine; then
+    engine=$(config__get .containers.engine) || return 1
     if ! command -v "$engine" > /dev/null; then
-      log__error "engine is $engine, which isn't installed"
+      log__error "containers.engine is $engine, which isn't installed"
       return 1
     fi
-  elif launch__rootless_podman; then
+  elif launch__is_rootless_podman; then
     engine=podman
   elif command -v podman > /dev/null; then
     engine=podman
@@ -93,7 +92,8 @@ launch__engine() {
     log__error "needs podman or docker"
     return 1
   fi
-  if [[ ${1:-} == socket ]] && ! { [[ $engine == podman ]] && launch__rootless_podman; }; then
+  # The socket lets a container start containers as whoever runs the engine; docker's is root's.
+  if [[ ${1:-} == socket ]] && ! { [[ $engine == podman ]] && launch__is_rootless_podman; }; then
     log__error "these tests need rootless podman: they get the engine's socket (engine: $engine)"
     return 1
   fi
@@ -124,45 +124,35 @@ launch__token() {
 }
 
 ################################################################################
-# The throwaway repos, checking that each exists, reporting every missing one.
-# Outputs:
-#   {"distributor": ..., "testbed": ..., "service2": ...} on stdout.
+# Checks that every role has a remote and that it exists, reporting every missing one.
 # Returns:
-#   0, or 1 when a repo isn't named or doesn't exist.
+#   0, or 1 when a remote isn't set or doesn't exist.
 ################################################################################
-launch__repos() {
-  local role repo repos='{}' failed=false
-  if ! config__has .repos && [[ ! -f $(config__state_file) ]]; then
-    log__error "no repos: run init.sh, or set repos in $(config__file)"
-    return 1
-  fi
-  for role in distributor testbed service2; do
-    if ! repo=$(config__repo "$role"); then
+launch__check_repos() {
+  local role repo failed=false
+  for role in $(config__get '.repos | keys[]'); do
+    if ! repo=$(config__get ".repos.$role.remote" 2> /dev/null); then
+      log__error "no $role remote: run init.sh, or set repos.$role.remote in $(config__file_user)"
       failed=true
     elif ! gh api "repos/$repo" > /dev/null 2>&1; then
       log__error "$repo not found (init.sh creates the repos)"
       failed=true
-    else
-      repos=$(jq -c --arg role "$role" --arg repo "$repo" '.[$role] = $repo' <<< "$repos")
     fi
   done
-  $failed && return 1
-  echo "$repos"
+  ! $failed
 }
 
 ################################################################################
-# Copies a checkout's code into the run directory as a plain repo with the commit under test
-# checked out (detached), whatever the source is. A local checkout gives its HEAD commit (a git
-# worktree's .git points outside it, so it's cloned) and must have no uncommitted changes to
-# tracked files: they wouldn't be tested. A GitHub repo gives its ref, or its latest release.
+# Copies a role's checkout into the run directory, at the commit under test: a local checkout's
+# HEAD (no uncommitted changes allowed), or a GitHub repo's ref or latest release.
 # Arguments:
-#   Role (distributor or testbed: checkouts.<role> in the configuration), destination.
+#   Role (one with repos.<role>.checkout), destination.
 # Returns:
 #   0, or 1 when the code can't be found or copied.
 ################################################################################
 launch__snapshot() {
   local checkout
-  checkout=$(config__get ".checkouts.$1") || return 1
+  checkout=$(config__get ".repos.$1.checkout") || return 1
   if jq -e 'has("path")' <<< "$checkout" > /dev/null; then
     launch__snapshot_path "$1" "$(jq -r .path <<< "$checkout")" "$2"
   else
@@ -184,28 +174,28 @@ launch__snapshot_path() {
     path="$(dirname "${BASH_SOURCE[0]}")/../../../$path"
   fi
   if ! dir=$(realpath "$path" 2> /dev/null) || [[ ! -d $dir ]]; then
-    log__error "checkouts.$1: $2 not found"
+    log__error "repos.$1.checkout: $2 not found"
     return 1
   fi
   if ! sha=$(git -C "$dir" rev-parse HEAD 2> /dev/null); then
-    log__error "checkouts.$1: $dir isn't a git checkout"
+    log__error "repos.$1.checkout: $dir isn't a git checkout"
     return 1
   fi
   if [[ -n $(git -C "$dir" status --porcelain --untracked-files=no) ]]; then
-    log__error "checkouts.$1: $dir has uncommitted changes (the tests use the HEAD commit)"
+    log__error "repos.$1.checkout: $dir has uncommitted changes (the tests use the HEAD commit)"
     return 1
   fi
+  # Cloned, since a git worktree's .git points outside it.
   if ! { git clone --quiet --no-checkout "$dir" "$3" &&
     git -C "$3" checkout --quiet --detach "$sha"; } 2> /dev/null; then
-    log__error "checkouts.$1: can't copy $dir's HEAD ($sha) into the run directory"
+    log__error "repos.$1.checkout: can't copy $dir's HEAD ($sha) into the run directory"
     return 1
   fi
   log__info "$1: ${sha:0:7} from $dir"
 }
 
 ################################################################################
-# launch__snapshot from a GitHub repo, fetched anonymously over HTTPS with its history (the
-# seed pushes it whole).
+# launch__snapshot from a GitHub repo, fetched anonymously over HTTPS with its history.
 # Arguments:
 #   Role, owner/name, ref (empty: the latest release), destination.
 # Returns:
@@ -214,37 +204,35 @@ launch__snapshot_path() {
 launch__snapshot_repo() {
   local ref=$3
   if [[ -z $ref ]] && ! ref=$(gh release view -R "$2" --json tagName -q .tagName 2> /dev/null); then
-    log__error "checkouts.$1: $2 has no release; set checkouts.$1.ref"
+    log__error "repos.$1.checkout: $2 has no release; set repos.$1.checkout.ref"
     return 1
   fi
   if ! { git init --quiet "$4" &&
     GIT_TERMINAL_PROMPT=0 git -C "$4" fetch --quiet "https://github.com/$2.git" "$ref" &&
     git -C "$4" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD; } 2> /dev/null
   then
-    log__error "checkouts.$1: can't fetch $2 at $ref"
+    log__error "repos.$1.checkout: can't fetch $2 at $ref"
     return 1
   fi
   log__info "$1: $(git -C "$4" rev-parse --short HEAD) from $2 at $ref"
 }
 
 ################################################################################
-# Writes the run's settings for the container: the configuration with the repos resolved, and
-# the run's own values under .run.
+# Writes the run's settings for the container: the configuration, and the run's own values
+# under .run.
 # Arguments:
-#   The repos (JSON from launch__repos), run id, run directory (shared with the container),
-#   the run's output directory, the engine command in the container (empty when it has none),
-#   the file.
+#   Run id, run directory, output directory, the engine command in the container (empty when
+#   it has none), the file.
 # Returns:
 #   0, or 1 when it can't be written.
 ################################################################################
 launch__settings() {
-  local merged
-  merged=$(config__merged) || return 1
-  if ! jq --argjson repos "$1" --arg id "$2" --arg share "$3" --arg out "$4" --arg engine "$5" \
-    '.repos = $repos | .run = {id: $id, share_dir: $share, output_dir: $out,
-      artifacts_dir: "\($out)/artifacts", engine: (if $engine == "" then null else $engine end)}' \
-    <<< "$merged" > "$6"; then
-    log__error "can't write $6"
+  config__build || return 1
+  if ! jq --arg id "$1" --arg share "$2" --arg out "$3" --arg engine "$4" \
+    '.run = {id: $id, share_dir: $share, output_dir: $out, artifacts_dir: "\($out)/artifacts",
+      engine: (if $engine == "" then null else $engine end)}' \
+    <<< "$IT_CONFIG_JSON" > "$5"; then
+    log__error "can't write $5"
     return 1
   fi
 }
@@ -276,8 +264,7 @@ launch__engine_socket() {
 }
 
 ################################################################################
-# Stops the podman service and deletes the run directory (keys, checkout copies, the gateway's
-# files).
+# Stops the podman service and deletes the run directory.
 # Arguments:
 #   Run directory, then the engine and tools image once known (to delete root-owned leftovers
 #   docker can leave).
@@ -292,21 +279,19 @@ launch__cleanup() {
 }
 
 ################################################################################
-# Runs one suite: the bats files under <suite>/cases in a transient tools container. Everything
-# the run needs is checked first, and every problem reported at once (only a missing tool stops
-# the checks early). The results (TAP)
-# go to stdout and <output_dir>/<run id>/report.tap; the settings the container got to
-# settings.json there; files tests export to artifacts/ there.
+# Runs one suite: the bats files under <suite>/cases in a transient tools container, after
+# checking everything the run needs and reporting every problem at once. Results (TAP) go to
+# stdout and <output_dir>/<run id>/report.tap, next to settings.json and artifacts/.
 # Arguments:
-#   Suite (ci or distro), --engine-socket to give the container the user's rootless podman
-#   (optional), then test names and bats options.
+#   Suite, --engine-socket to give the container the user's rootless podman (optional), then
+#   test names and bats options.
 # Returns:
 #   bats' exit status, or 1 when the run couldn't start.
 ################################################################################
 launch__run() {
-  local suite=$1 socket="" root id run_dir engine="" token repos image out role sock status
+  local suite=$1 socket="" root id run_dir engine="" token image out role sock status
   local failed=false
-  local -a options
+  local -a options checkouts=()
   shift
   if [[ ${1:-} == --engine-socket ]]; then
     socket=socket
@@ -314,6 +299,8 @@ launch__run() {
   fi
   root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
   launch__check_tools || return 1
+  # Merged once here, for every config__get below and in the scripts this one runs.
+  config__build || return 1
 
   id=$(date -u +%Y%m%dT%H%M%SZ)
   # /dev/shm: RAM-backed, and a short path for the engine socket.
@@ -328,12 +315,13 @@ launch__run() {
   launch__check_agent || failed=true
   token=$(launch__token) || failed=true
   engine=$(launch__engine $socket) || failed=true
-  repos=$(launch__repos) || failed=true
-  image=$(config__get .images.tools) || failed=true
+  launch__check_repos || failed=true
+  image=$(config__get .containers.images.tools) || failed=true
   out=$(config__get .output_dir) || failed=true
   out=${out/#\~/$HOME}/$id
-  for role in distributor testbed; do
+  for role in $(config__get '.repos | to_entries[] | select(.value.checkout) | .key'); do
     launch__snapshot "$role" "$run_dir/src/$role" || failed=true
+    checkouts+=(-v "$run_dir/src/$role:/src/$role:ro")
   done
   if $failed; then
     log__error "nothing was run: fix the above first"
@@ -351,8 +339,8 @@ launch__run() {
     sock=$(launch__engine_socket "$run_dir") || return 1
     mapfile -t options <<< "$sock"
   fi
-  launch__settings "$repos" "$id" "$run_dir" "$out" "${socket:+podman-remote}" \
-    "$out/settings.json" || return 1
+  launch__settings "$id" "$run_dir" "$out" "${socket:+podman-remote}" "$out/settings.json" ||
+    return 1
   log__info "run $id ($suite, $engine); report: $out/report.tap"
 
   # Ctrl-C reaches the container through the engine, which stops the running test and runs the
@@ -363,7 +351,7 @@ launch__run() {
     -v "$root:/suite:ro" \
     -v "$out/settings.json:$(settings__file):ro" \
     -v "$run_dir:$run_dir" -v "$out:$out" \
-    -v "$run_dir/src/distributor:/src/distributor:ro" -v "$run_dir/src/testbed:/src/testbed:ro" \
+    "${checkouts[@]}" \
     -v "$SSH_AUTH_SOCK:/run/ssh-agent.sock" -e SSH_AUTH_SOCK=/run/ssh-agent.sock \
     "${options[@]}" "$image" bash /suite/run-in-container.sh "$suite" "$@" |
     tee -i "$out/report.tap"

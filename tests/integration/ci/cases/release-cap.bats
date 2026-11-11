@@ -1,20 +1,14 @@
 # One poll admits at most MAX_RELEASES releases (lowered to 3 here); the rest wait for the next.
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../lib/lifecycle.sh"
-  source "$BATS_TEST_DIRNAME/../lib/git.sh"
-  source "$BATS_TEST_DIRNAME/../lib/github.sh"
-  source "$BATS_TEST_DIRNAME/../lib/poll.sh"
-  source "$BATS_TEST_DIRNAME/../lib/state.sh"
-  source "$BATS_TEST_DIRNAME/../lib/suite.sh"
-  source "$BATS_TEST_DIRNAME/../lib/wait.sh"
+  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
   lifecycle__reset
 }
 
 @test "a poll processes at most MAX_RELEASES releases" {
   local distributor repo dir tag
-  distributor=$(suite__distributor_repo)
-  repo=$(suite__service2_repo)
+  distributor=$(settings__get .repos.distributor.remote)
+  repo=$(settings__get .repos.fixture.remote)
   # The cap is a constant in discover.sh; the next test's reset restores the seed commit.
   dir=$(mktemp -d)
   git__clone "$distributor" "$dir/repo"

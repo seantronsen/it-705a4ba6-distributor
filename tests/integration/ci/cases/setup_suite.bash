@@ -2,11 +2,11 @@
 # Once per run, around every test: prepare the repos, then clean them up.
 
 setup_suite() {
-  source "$(dirname "${BASH_SOURCE[0]}")/../lib/lifecycle.sh"
+  source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
   lifecycle__setup_suite
 }
 
 teardown_suite() {
-  source "$(dirname "${BASH_SOURCE[0]}")/../lib/lifecycle.sh"
+  source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
   lifecycle__teardown_suite
 }

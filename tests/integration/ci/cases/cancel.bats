@@ -1,13 +1,7 @@
 # A poll cancelled mid-run commits nothing; the next poll admits the release normally.
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../lib/lifecycle.sh"
-  source "$BATS_TEST_DIRNAME/../lib/crafted.sh"
-  source "$BATS_TEST_DIRNAME/../lib/github.sh"
-  source "$BATS_TEST_DIRNAME/../lib/poll.sh"
-  source "$BATS_TEST_DIRNAME/../lib/state.sh"
-  source "$BATS_TEST_DIRNAME/../lib/suite.sh"
-  source "$BATS_TEST_DIRNAME/../lib/wait.sh"
+  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
   lifecycle__reset
 }
 
@@ -21,7 +15,7 @@ setup() {
 ################################################################################
 cancel_mid_run() {
   local distributor jobs
-  distributor=$(suite__distributor_repo)
+  distributor=$(settings__get .repos.distributor.remote)
   jobs=$(gh api "repos/$distributor/actions/runs/$1/jobs?per_page=100" \
     -q '.jobs[] | "\(.name)\t\(.status)"')
   grep -q $'^record[^\t]*\t\(in_progress\|completed\)' <<< "$jobs" && return 2
@@ -30,10 +24,10 @@ cancel_mid_run() {
 }
 
 @test "a poll cancelled mid-run commits nothing" {
-  local repo distributor before run
-  repo=$(suite__service2_repo)
-  distributor=$(suite__distributor_repo)
-  crafted__release "$repo" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  local role=fixture repo distributor before run
+  repo=$(settings__get ".repos.$role.remote")
+  distributor=$(settings__get .repos.distributor.remote)
+  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   before=$(github__head_sha "$distributor")
   run=$(poll__dispatch 1)
   wait__until "admit or publish running in $run, then cancel" cancel_mid_run "$run"

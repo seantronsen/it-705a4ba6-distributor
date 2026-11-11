@@ -27,84 +27,94 @@
 # A key set in neither is an error, except where noted.
 
 # -------------------------------------------------------------------------
-# Code Under Test
+# Repos
 # -------------------------------------------------------------------------
 
-# The code each throwaway repo is templated from: copied to a temporary
-# directory, then force-pushed to the repo with the suite's changes. Each entry
-# is one of:
+# Each repo the suite uses, by role. Each role takes:
 #
-#   path: a local checkout. Its HEAD commit is used, and tracked files must be
-#         committed. Relative paths start at this repo's root. Git worktrees
-#         work.
-#   repo: a GitHub repo (owner/name), fetched anonymously over HTTPS, with
-#   ref:  a commit, tag, or branch (optional; default: its latest release).
-#
-# An entry in your config file replaces the whole entry here: setting path
-# drops repo and ref, and the other way round.
-checkouts:
+#   remote:   the throwaway GitHub repo (owner/name). It's overwritten
+#             completely on every run: use repos made for this only. Set all
+#             or none. Normally left unset: init.sh creates random ones and
+#             records them in its state file
+#             (~/.local/state/distributor-it/repos.yaml), and destroy.sh
+#             deletes them. Set here, they're used instead, and init.sh and
+#             destroy.sh leave them alone.
+#   checkout: the code the repo is templated from: copied to a temporary
+#             directory, then force-pushed to the remote with the suite's
+#             changes. One of:
+#               path: a local checkout. Its HEAD commit is used, and tracked
+#                     files must be committed. Relative paths start at this
+#                     repo's root. Git worktrees work.
+#               repo: a GitHub repo (owner/name), fetched anonymously over
+#                     HTTPS, with
+#               ref:  a commit, tag, or branch (optional; default: its latest
+#                     release).
+#             A checkout in your config file replaces the whole checkout
+#             here: setting path drops repo and ref, and the other way round.
+#   packages: the packages the repo's releases carry, which the distributor's
+#             config allows it.
+repos:
   # The distributor.
   #
-  # Default: this repo
+  # Default: this repo; remote unset
   distributor:
-    path: .
+    checkout:
+      path: .
+    #remote: you/my-distributor
 
-  # The testbed (a service repo with real release builds).
+  # A service repo whose own release workflow builds real releases.
   #
-  # Default: OpenCHAMI/github-actions-testbed at its latest release
-  testbed:
-    repo: OpenCHAMI/github-actions-testbed
+  # Default: OpenCHAMI/github-actions-testbed at its latest release; remote
+  #          unset
+  service:
+    checkout:
+      repo: OpenCHAMI/github-actions-testbed
+    packages: [testbed, testbed-quadlet]
+    #remote: you/my-service
 
-# -------------------------------------------------------------------------
-# Throwaway Repos
-# -------------------------------------------------------------------------
-
-# The throwaway repos (owner/name), all three or none. They're overwritten
-# completely on every run: use repos made for this only.
-#
-# Normally left unset: init.sh creates random ones and records them in its
-# state file (~/.local/state/distributor-it/repos.yaml), and destroy.sh
-# deletes them. Set here, they're used instead, and init.sh and destroy.sh
-# leave them alone. The second service repo's name should start with the
-# testbed's plus "-" (package-rules' longer-name check needs it).
-#
-# Default: unset (the state file's)
-#repos:
-#  distributor: you/my-distributor
-#  testbed: you/my-testbed
-#  service2: you/my-testbed-tools
+  # A service repo that only gets releases the suite crafts (no checkout). Its
+  # remote's name must start with service's plus "-" (package-rules'
+  # longer-name check needs it). Its entry stays even with nothing set, so
+  # it's still one of the roles:
+  #
+  #   fixture:
+  #     remote: you/my-service-tools
+  #
+  # Default: remote unset
+  fixture: {}
 
 # -------------------------------------------------------------------------
 # Containers
 # -------------------------------------------------------------------------
 
-images:
-  # The tools container both suites run in.
+containers:
+  # The container engine: podman or docker. The distro tests need rootless
+  # podman (their tools container gets its socket).
   #
-  # Default: docker.io/library/debian:13
-  tools: docker.io/library/debian:13
+  # Default: unset (rootless podman, else podman, else docker: the first
+  #          installed)
+  #engine: podman
 
-  # distro: the Fedora target (dnf installs).
-  #
-  # Default: docker.io/library/fedora:42
-  fedora: docker.io/library/fedora:42
+  images:
+    # The tools container both suites run in.
+    #
+    # Default: docker.io/library/debian:13
+    tools: docker.io/library/debian:13
 
-  # distro: the Debian target (apt installs).
-  #
-  # Default: docker.io/library/debian:13
-  debian: docker.io/library/debian:13
+    # distro: the Fedora target (dnf installs).
+    #
+    # Default: docker.io/library/fedora:42
+    fedora: docker.io/library/fedora:42
 
-  # distro: the temporary S3 gateway.
-  #
-  # Default: docker.io/versity/versitygw:v1.10.0
-  versitygw: docker.io/versity/versitygw:v1.10.0
+    # distro: the Debian target (apt installs).
+    #
+    # Default: docker.io/library/debian:13
+    debian: docker.io/library/debian:13
 
-# The container engine: podman or docker. The distro tests need rootless
-# podman (their tools container gets its socket).
-#
-# Default: unset (rootless podman, else podman, else docker: the first
-#          installed)
-#engine: podman
+    # distro: the temporary S3 gateway.
+    #
+    # Default: docker.io/versity/versitygw:v1.10.0
+    versitygw: docker.io/versity/versitygw:v1.10.0
 
 # -------------------------------------------------------------------------
 # Runs
@@ -116,43 +126,82 @@ images:
 # Default: /tmp/distributor-it
 output_dir: /tmp/distributor-it
 
-# Longest any single wait on GitHub may take, in seconds.
-#
-# Default: 3600
-timeout: 3600
+wait:
+  # Longest any single wait on GitHub may take, in seconds.
+  #
+  # Default: 3600
+  timeout: 3600
 
-# Pause between checks while waiting on GitHub, in seconds.
-#
-# Default: 10
-poll_interval: 10
+  # Pause between checks while waiting on GitHub, in seconds.
+  #
+  # Default: 10
+  interval: 10
 
 # Leave the GitHub repos as the run's last test left them (no end-of-run
 # cleanup), for inspection. Every test still resets them before it starts.
 #
 # Default: false
-keep: false
+keep_repos: false
 
 # -------------------------------------------------------------------------
-# S3 Gateway (distro)
+# Keys
 # -------------------------------------------------------------------------
 
-gateway:
-  # Root credentials of the temporary S3 gateway (versitygw). Not secret: it's
-  # reachable only from the containers on its private network (and 127.0.0.1
-  # when kept), and it serves public test data.
+keys:
+  # Algorithm of the root, repo, and crafted release signing keys (as gpg
+  # --quick-generate-key takes it).
   #
-  # Default: it / distributor-it
-  access_key: it
-  secret_key: distributor-it
+  # Default: ed25519
+  algorithm_attestation: ed25519
 
-  # Leave the gateway running after its test file, with its files, published
-  # on 127.0.0.1:<port>, for inspection. The end of the test file logs how to
-  # remove it; nothing removes it automatically.
+  # Algorithm of the archive key, which signs the published repositories.
   #
-  # Default: false
-  keep: false
+  # Default: rsa3072
+  algorithm_archive: rsa3072
 
-  # Host port a kept gateway is published on (127.0.0.1 only).
-  #
-  # Default: 7070
-  port: 7070
+# -------------------------------------------------------------------------
+# S3
+# -------------------------------------------------------------------------
+
+s3:
+  # A real AWS test bucket the s3 integration tests publish to.
+  remote:
+    # Its name, region, and public base URL. Normally left unset:
+    # s3/init-aws.sh creates one and records it in its state file
+    # (~/.local/state/distributor-it/s3.json), and s3/destroy-aws.sh deletes
+    # it. Set here, they're used instead (with credentials in
+    # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY).
+    #
+    # Default: unset (the state file's)
+    #bucket: my-bucket
+    #region: us-east-1
+    #url: https://my-bucket.s3.us-east-1.amazonaws.com
+
+    # The metadata-max-age the tests give the distributor's S3 target, in
+    # seconds.
+    #
+    # Default: 60
+    metadata_max_age: 60
+
+  # The temporary local S3 gateway (versitygw) the distro integration tests
+  # install from.
+  local:
+    # Its root credentials. Not secret: it's reachable only from the
+    # containers on its private network (and 127.0.0.1 when kept), and it
+    # serves public test data.
+    #
+    # Default: it / distributor-it
+    access_key: it
+    secret_key: distributor-it
+
+    # Leave it running after its test file, with its files, published on
+    # 127.0.0.1:<port>, for inspection. The end of the test file logs how to
+    # remove it; nothing removes it automatically.
+    #
+    # Default: false
+    keep: false
+
+    # Host port a kept gateway is published on (127.0.0.1 only).
+    #
+    # Default: 7070
+    port: 7070

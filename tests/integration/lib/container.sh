@@ -8,13 +8,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/settings.sh"
 
 ################################################################################
-# Installs the suites' tools with apt, plus the engine client when the run has one (the
-# container has the host engine's socket). jq comes first: reading the settings needs it.
+# Installs the suites' tools with apt, plus the engine client when the run has one.
 # Returns:
 #   0, or 1 when apt failed.
 ################################################################################
 container__install_tools() {
-  local packages=(bats ca-certificates gh git gnupg openssh-client rpm)
+  local packages=(bats ca-certificates curl gh git gnupg openssh-client pipx rpm)
+  # jq first: reading the settings needs it.
   if ! { apt-get update -qq && apt-get install -y -qq --no-install-recommends jq; } \
     > /dev/null 2>&1; then
     log__error "apt couldn't install jq"
@@ -28,13 +28,13 @@ container__install_tools() {
 }
 
 ################################################################################
-# GitHub access for git (gh already has GH_TOKEN): over SSH through the host's agent, with
-# github.com's host keys taken from GitHub's API (over TLS) instead of trusted on first use.
+# GitHub access for git (gh already has GH_TOKEN): over SSH through the host's agent.
 # Returns:
 #   0, or 1 when the host keys can't be fetched.
 ################################################################################
 container__setup_github_access() {
   install -d -m 700 ~/.ssh
+  # github.com's host keys from GitHub's API (over TLS), instead of trusted on first use.
   if ! gh api meta -q '.ssh_keys[] | "github.com " + .' > ~/.ssh/known_hosts; then
     log__error "can't fetch github.com's SSH host keys"
     return 1

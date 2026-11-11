@@ -4,12 +4,12 @@
 [[ -n ${_IT_GIT_SH:-} ]] && return 0
 _IT_GIT_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 
 ################################################################################
 # The SSH remote of a repo.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Outputs:
 #   The URL on stdout.
 ################################################################################
@@ -18,7 +18,7 @@ git__url() { echo "git@github.com:$1.git"; }
 ################################################################################
 # Clones a repo's main branch (latest commit only).
 # Arguments:
-#   owner/name, destination directory (must not exist).
+#   Repo path (owner/name), destination directory.
 # Returns:
 #   0, or 1 when the clone failed.
 ################################################################################
@@ -48,7 +48,7 @@ git__commit() {
 ################################################################################
 # Pushes a working tree's HEAD to a repo's main branch.
 # Arguments:
-#   Directory, owner/name, then extra git push options (e.g. --force).
+#   Directory, repo path (owner/name), then extra git push options.
 # Returns:
 #   0, or 1 when the push failed.
 ################################################################################
@@ -57,6 +57,28 @@ git__push_main() {
     log__error "can't push to $2"
     return 1
   fi
+}
+
+################################################################################
+# Adds a workflow that runs on every tag push but no-run-*, so the distributor's publisher check
+# finds a push run (and its actor) for a tag.
+# Arguments:
+#   Directory.
+################################################################################
+git__add_tag_workflow() {
+  mkdir -p "$1/.github/workflows"
+  cat > "$1/.github/workflows/it-tag.yml" << 'EOF'
+name: it-tag
+on:
+  push:
+    tags-ignore: ['no-run-*']
+permissions: {}
+jobs:
+  tag:
+    runs-on: ubuntu-slim
+    steps:
+      - run: 'true'
+EOF
 }
 
 ################################################################################

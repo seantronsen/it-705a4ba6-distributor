@@ -5,10 +5,9 @@
 #   ci/run.sh retention noop         these tests (file names, .bats optional)
 #   ci/run.sh --filter 'deny'        bats options pass through
 #
-# Everything runs in one transient tools container with no access to the container engine. The
-# GitHub token reaches it on stdin only; git pushes over SSH through your agent. Logs go to
-# stderr; the results (TAP) go to stdout and to <output_dir>/<run id>/report.tap. Files tests
-# export (real-build's published repositories) go to <output_dir>/<run id>/artifacts.
+# Runs in one transient tools container without the container engine; git pushes through your
+# SSH agent. Logs go to stderr; results (TAP) to stdout and <output_dir>/<run id>/report.tap,
+# with exported files in artifacts/ there.
 #
 # Settings: config.defaults.yaml, overridden by ~/.config/distributor-it/config.yaml.
 set -uo pipefail

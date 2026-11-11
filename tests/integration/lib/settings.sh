@@ -1,7 +1,6 @@
 # shellcheck shell=bash
-# The run's settings inside the tools container: the resolved configuration the launcher writes
-# (defaults applied, repos resolved) plus the run's own values under .run, mounted
-# read-only. Nothing in the container has defaults of its own.
+# The run's settings inside the tools container: the configuration the launcher writes, plus the
+# run's own values under .run.
 
 [[ -n ${_IT_SETTINGS_SH:-} ]] && return 0
 _IT_SETTINGS_SH=1
@@ -29,7 +28,7 @@ settings__has() {
 ################################################################################
 # One setting.
 # Arguments:
-#   jq path (e.g. .timeout, .run.engine).
+#   jq path (e.g. .wait.timeout, .run.engine).
 # Outputs:
 #   The value on stdout.
 # Returns:

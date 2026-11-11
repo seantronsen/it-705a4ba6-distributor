@@ -208,8 +208,31 @@ Libs:
   that in the file comment, with what would change for parallelism.
 - `distributor.sh`: `distributor__push_config` may mix concerns by also waiting for the push's
   poll; discuss.
-- `wait.sh`: `wait__check`'s 10 s retry sleep and its 3 tries are hardcoded; make them settings
-  (`config.defaults.yaml`).
+- TODO, after Sean approves the pilot round (renames would force full-file rereviews): hoist
+  the libs shared across suites. `ci/lib` is the shared harness in practice: s3 sources 11 of
+  its files and distro `suite.sh`; only `edit`, `issues`, `keyring` are ci-only. Move the rest
+  to a shared dir (e.g. `lib/github/`); also distro's `images`, `install`, `target` (s3's
+  install cases use them). Fold `s3__install_tools` (curl) into `container__install_tools`, so
+  the ci and s3 `setup_suite.bash` match. Share one JSON getter between `settings__get` and
+  `config__get` (and reconsider the config/settings naming). Decide whether `lib/` splits
+  host-side (config, launch, random, engine) from container-side code.
+- TODO, first after the pilot review: reshape the test config. One entry per repo role,
+  `repos.<role>: {remote, checkout, packages}`, roles renamed `distributor`, `service` (real
+  release builds; github-actions-testbed by default), `fixture` (crafted releases only). The
+  role list becomes `.repos | keys[]`; the `checkouts` block goes. Proposed, to discuss:
+  1. `config.sh` merges init.sh's `repos.yaml` (kept flat, mapped by one jq line) under the
+     user config, so `.repos` has one source instead of three.
+  2. The same merge takes `s3.json`'s bucket, region, url (never the credentials), dropping
+     `s3_run__use_state_settings`' temp config copy.
+  3. `fixture` gets no `packages`; the crafted names stay in `crafted.sh`.
+  4. `wait: {timeout, interval}`; `wait__check`'s tries and sleep stay inline.
+  5. One role-agnostic `suite__repo <role>` replaces the three role getters.
+  6. Existing `repos.yaml` files (keyed `testbed`/`service2`) get a one-line `yq` rename, no
+     fallback code.
+  7. `testbed.sh` and `testbed__*` are renamed in the hoist round.
+- TODO, next after the test config: a JSON Schema for `state/state.json`, as
+  `config/repos.schema.json` is for the config. Today its shape is only the example in `spec.md`
+  (State), and the scripts, the poll, and the tests each assume it.
 - TODO, reconsider: a JSON Schema for the test config (`config.defaults.yaml` and user
   overrides), as `config/repos.schema.json` does for the distributor. Not yet: the settings are
   still fluid, `lib/config.sh` already checks every setting it reads, and it would add Python and

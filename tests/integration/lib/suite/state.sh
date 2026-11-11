@@ -4,6 +4,7 @@
 [[ -n ${_IT_STATE_SH:-} ]] && return 0
 _IT_STATE_SH=1
 
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 
 ################################################################################
@@ -13,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 ################################################################################
 state__get() {
   gh api -H 'Accept: application/vnd.github.raw' \
-    "repos/$(suite__distributor_repo)/contents/state/state.json?ref=main"
+    "repos/$(settings__get .repos.distributor.remote)/contents/state/state.json?ref=main"
 }
 
 ################################################################################
@@ -28,9 +29,31 @@ state__has() {
 }
 
 ################################################################################
+# Whether the state matches state/state.schema.json, checked with the distributor's pinned
+# check-jsonschema as its workflows run it.
+# Returns:
+#   0 when it does, 1 when it doesn't (the errors on stdout) or can't be read.
+################################################################################
+state__is_valid() {
+  local file status
+  file=$(mktemp --suffix .json)
+  if ! state__get > "$file"; then
+    log__error "can't read state.json"
+    rm -f "$file"
+    return 1
+  fi
+  pipx run --spec "$(grep '^check-jsonschema==' /src/distributor/config/requirements.txt)" \
+    check-jsonschema --schemafile /src/distributor/state/state.schema.json "$file"
+  status=$?
+  rm -f "$file"
+  ((status == 0)) || log__error "state.json on main doesn't match state/state.schema.json"
+  return "$status"
+}
+
+################################################################################
 # A release's status.
 # Arguments:
-#   owner/name, tag.
+#   Repo path (owner/name), tag.
 # Outputs:
 #   published, skipped, rejected, or absent, on stdout.
 ################################################################################
@@ -41,11 +64,11 @@ state__release_status() {
 ################################################################################
 # Whether none of a repo's packages is published any more.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Returns:
 #   0 when none is, 1 otherwise.
 ################################################################################
-state__none_published() {
+state__has_none_published() {
   state__get | jq -e --arg r "$1@" '
     all(to_entries[] | select(.key | startswith($r)) | .value.packages[]?; .status != "published")
   ' > /dev/null

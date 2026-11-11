@@ -13,6 +13,9 @@
 #   MASTER_PUBLIC_ASC, MASTER_FPR   root public key and fingerprint (admit)
 
 set -euo pipefail
+# set -e in $(...) too: e.g. a signing failure inside meta=$(rpm_metadata ...) fails the script
+# instead of publishing an empty signature.
+shopt -s inherit_errexit
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CONFIG=${CONFIG:-$ROOT/config/repos.yaml}
@@ -81,8 +84,8 @@ release_assets() { # <owner/repo> <tag>
 # {run, attempt, role, login, id, type}: each run's actor (role "pushed") and the triggering
 # actor of each of its attempts (role "ran"). A re-run replaces the run's triggering actor, so
 # earlier attempts are read one by one. Runs match by head_branch, so pushes to a branch with
-# the tag's name count too. Returns 1 on any API failure (set -e is off in $(...)), so a failed
-# call is an infrastructure error, never an empty list.
+# the tag's name count too. Returns 1 on any API failure (set -e is off when it's called from a
+# condition), so a failed call is an infrastructure error, never an empty list.
 tag_push_actors() { # <owner/repo> <tag>
   local repo=$1 tag=$2 runs reruns run count n
   runs=$(gh api --paginate "repos/$repo/actions/runs?event=push&branch=$(uri "$tag")&per_page=100" \

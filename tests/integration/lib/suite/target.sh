@@ -1,25 +1,22 @@
 # shellcheck shell=bash
 # The distros' own package managers installing from published repositories, each in a clean
-# sibling container, the repository and package signatures checked against the archive key.
-# Repositories are in the distributor's publish layout (rpm/, deb/, keys/archive.asc) under a
-# base URL: file:///repo for the files themselves, or the gateway's URL. The key always comes
-# from the files, mounted at /repo, until the keyring package exists.
+# sibling container, checking signatures against the archive key. A base URL is file:///repo
+# for the files themselves (mounted at /repo), or the gateway's URL.
 
 [[ -n ${_IT_TARGET_SH:-} ]] && return 0
 _IT_TARGET_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/engine.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../engine.sh"
 
 ################################################################################
 # Installs a package with dnf, only the published repository enabled.
 # Arguments:
-#   Image, the published files (a path on the host), base URL, package, then extra engine
-#   options (e.g. --network).
+#   Image, the published files' directory, base URL, package, then extra engine options.
 # Returns:
 #   0 when installed, 1 otherwise.
 ################################################################################
-target__dnf() {
+target__install_dnf() {
   local image=$1 dir=$2 base=$3 package=$4
   shift 4
   if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \
@@ -45,12 +42,11 @@ EOF
 # Installs a package with apt, only the published repository configured, signed-by the archive
 # key.
 # Arguments:
-#   Image, the published files (a path on the host), base URL, package, then extra engine
-#   options (e.g. --network).
+#   Image, the published files' directory, base URL, package, then extra engine options.
 # Returns:
 #   0 when installed, 1 otherwise.
 ################################################################################
-target__apt() {
+target__install_apt() {
   local image=$1 dir=$2 base=$3 package=$4
   shift 4
   if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \

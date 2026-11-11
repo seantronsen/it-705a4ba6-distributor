@@ -5,10 +5,11 @@
 [[ -n ${_IT_POLL_SH:-} ]] && return 0
 _IT_POLL_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/wait.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../wait.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../github.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/workflow.sh"
 
 ################################################################################
 # The poll run a push of a commit triggered.
@@ -18,8 +19,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
 #   The run id on stdout, or nothing yet.
 ################################################################################
 poll__push_run() {
-  gh api "repos/$(suite__distributor_repo)/actions/workflows/poll.yml/runs?event=push&head_sha=$1" \
-    -q '.workflow_runs[0].id // empty'
+  gh api "repos/$(settings__get .repos.distributor.remote)/actions/workflows/poll.yml/runs" -X GET \
+    -f event=push -f "head_sha=$1" -q '.workflow_runs[0].id // empty'
 }
 
 ################################################################################
@@ -34,16 +35,6 @@ poll__has_push_run() {
 }
 
 ################################################################################
-# The newest poll run's id, of any trigger.
-# Outputs:
-#   The id on stdout (0 when there is none).
-################################################################################
-poll__latest() {
-  gh api "repos/$(suite__distributor_repo)/actions/workflows/poll.yml/runs?per_page=1" \
-    -q '.workflow_runs[0].id // 0'
-}
-
-################################################################################
 # Dispatched poll runs newer than a given run.
 # Arguments:
 #   Run id.
@@ -51,7 +42,7 @@ poll__latest() {
 #   Their ids on stdout, oldest first, one per line.
 ################################################################################
 poll__dispatches_after() {
-  gh api "repos/$(suite__distributor_repo)/actions/workflows/poll.yml/runs" \
+  gh api "repos/$(settings__get .repos.distributor.remote)/actions/workflows/poll.yml/runs" \
     -X GET -f event=workflow_dispatch -f per_page=20 \
     -q "[.workflow_runs[] | select(.id > $1) | .id] | sort | .[]"
 }
@@ -78,8 +69,8 @@ poll__has_dispatches_after() {
 ################################################################################
 poll__dispatch() {
   local repo count=$1 before i id
-  repo=$(suite__distributor_repo)
-  before=$(poll__latest)
+  repo=$(settings__get .repos.distributor.remote)
+  before=$(workflow__latest poll.yml)
   for ((i = 0; i < count; i++)); do
     if ! gh workflow run poll.yml -R "$repo" --ref main > /dev/null; then
       log__error "can't dispatch poll"
@@ -104,13 +95,13 @@ poll__dispatch() {
 poll__run() {
   local id
   id=$(poll__dispatch 1) || return 1
-  github__run_wait "$(suite__distributor_repo)" "$id" > /dev/null || return 1
+  github__run_wait "$(settings__get .repos.distributor.remote)" "$id" > /dev/null || return 1
   echo "$id"
 }
 
 ################################################################################
-# Downloads the repositories a poll run published (its target-publish-rpm and -deb artifacts)
-# into one directory, laid out as the distributor publishes: rpm/, deb/, keys/archive.asc.
+# Downloads the repositories a poll run published into one directory, laid out as the
+# distributor publishes them: rpm/, deb/, keys/archive.asc.
 # Arguments:
 #   Run id, destination directory.
 # Returns:
@@ -118,7 +109,7 @@ poll__run() {
 ################################################################################
 poll__download_published() {
   local repo tmp format
-  repo=$(suite__distributor_repo)
+  repo=$(settings__get .repos.distributor.remote)
   tmp=$(mktemp -d)
   for format in rpm deb; do
     if ! gh run download "$1" -R "$repo" -n "target-publish-$format" -D "$tmp/$format"; then

@@ -4,13 +4,12 @@
 [[ -n ${_IT_WAIT_SH:-} ]] && return 0
 _IT_WAIT_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/suite/suite.sh"
 
 ################################################################################
 # Runs a command every poll interval until it succeeds or the timeout passes. The command
-# returns 0 when done, 1 for "not yet", and anything else to give up early (e.g. a release
-# build failed).
+# returns 0 when done, 1 for "not yet", and anything else to give up early.
 # Arguments:
 #   Description, then the command and its arguments.
 # Outputs:
@@ -21,7 +20,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 wait__until() {
   local desc=$1 deadline rc
   shift
-  deadline=$((SECONDS + $(suite__timeout)))
+  deadline=$((SECONDS + $(settings__get .wait.timeout)))
   log__info "waiting: $desc"
   while true; do
     rc=0
@@ -38,10 +37,10 @@ wait__until() {
         ;;
     esac
     if ((SECONDS >= deadline)); then
-      log__error "timed out after $(suite__timeout)s: $desc"
+      log__error "timed out after $(settings__get .wait.timeout)s: $desc"
       return 1
     fi
-    sleep "$(suite__poll_interval)"
+    sleep "$(settings__get .wait.interval)"
   done
 }
 

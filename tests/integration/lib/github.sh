@@ -1,17 +1,25 @@
 # shellcheck shell=bash
-# Generic GitHub API helpers through gh: commits, workflow runs, releases, issues, and wiping a
-# repo back to an empty state.
+# Generic GitHub API helpers through gh.
 
 [[ -n ${_IT_GITHUB_SH:-} ]] && return 0
 _IT_GITHUB_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait.sh"
+
+################################################################################
+# The gh user's GitHub user ID (what the distributor's publishers block is keyed by).
+# Outputs:
+#   The ID on stdout.
+################################################################################
+github__user_id() {
+  gh api user -q .id
+}
 
 ################################################################################
 # The SHA of a repo's main branch.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Outputs:
 #   The SHA on stdout.
 ################################################################################
@@ -20,13 +28,13 @@ github__head_sha() {
 }
 
 ################################################################################
-# Whether a repo has any workflow run that isn't completed (queued, in progress, waiting...).
+# Whether a repo has no workflow run that isn't completed.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Returns:
 #   0 when idle, 1 otherwise.
 ################################################################################
-github__runs_idle() {
+github__is_idle() {
   [[ $(gh api "repos/$1/actions/runs?per_page=100" \
     -q '[.workflow_runs[] | select(.status != "completed")] | length') == 0 ]]
 }
@@ -34,36 +42,46 @@ github__runs_idle() {
 ################################################################################
 # Waits until a repo has no active workflow runs.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Returns:
 #   0 when idle, 1 on timeout.
 ################################################################################
 github__wait_idle() {
-  wait__until "$1: no active runs" github__runs_idle "$1"
+  wait__until "$1: no active runs" github__is_idle "$1"
 }
 
 ################################################################################
 # Waits for a workflow run to complete.
 # Arguments:
-#   owner/name, run id.
+#   Repo path (owner/name), run id.
 # Outputs:
 #   The run's conclusion (success, failure, cancelled...) on stdout.
 # Returns:
 #   0, or 1 on timeout.
 ################################################################################
 github__run_wait() {
-  wait__until "run $2 completes" github__run_completed "$1" "$2" || return 1
+  wait__until "run $2 completes" github__is_run_completed "$1" "$2" || return 1
   gh api "repos/$1/actions/runs/$2" -q .conclusion
+}
+
+################################################################################
+# Logs a finished run's failed steps, for diagnosing it after the suite deletes its runs.
+# Arguments:
+#   Repo path (owner/name), run id.
+################################################################################
+github__log_failed() {
+  log__error "run: https://github.com/$1/actions/runs/$2"
+  gh run view "$2" -R "$1" --log-failed 2>&1 | tail -n 40 >&2
 }
 
 ################################################################################
 # Whether a workflow run has completed.
 # Arguments:
-#   owner/name, run id.
+#   Repo path (owner/name), run id.
 # Returns:
 #   0 when completed, 1 otherwise.
 ################################################################################
-github__run_completed() {
+github__is_run_completed() {
   [[ $(gh api "repos/$1/actions/runs/$2" -q .status) == completed ]]
 }
 
@@ -72,11 +90,11 @@ github__run_completed() {
 # "prune / prune (rpm)") ending with one conclusion. A reusable workflow's job is named
 # "<caller job> / <job>" when it ran, and just "<caller job>" when the caller was skipped.
 # Arguments:
-#   owner/name, run id, job name (e.g. "admit / admit", or "admit" when skipped), conclusion.
+#   Repo path (owner/name), run id, job name, conclusion.
 # Returns:
 #   0 when there are such jobs and all match, 1 otherwise.
 ################################################################################
-github__jobs_concluded() {
+github__has_jobs_concluded() {
   local conclusions
   conclusions=$(gh api --paginate "repos/$1/actions/runs/$2/jobs?per_page=100" \
     -q ".jobs[] | select(.name == \"$3\" or (.name | startswith(\"$3 (\"))) | .conclusion")
@@ -84,9 +102,20 @@ github__jobs_concluded() {
 }
 
 ################################################################################
+# Whether a tag push has a workflow run yet.
+# Arguments:
+#   Repo path (owner/name), tag.
+# Returns:
+#   0 when it has, 1 otherwise.
+################################################################################
+github__has_push_run() {
+  [[ $(gh api "repos/$1/actions/runs?event=push&branch=$2" -q '.workflow_runs | length') -gt 0 ]]
+}
+
+################################################################################
 # Creates a release, and with it its tag on main.
 # Arguments:
-#   owner/name, tag, then options for gh release create (e.g. --prerelease) and files.
+#   Repo path (owner/name), tag, then options for gh release create and files.
 # Returns:
 #   0, or 1 when the release wasn't created.
 ################################################################################
@@ -101,7 +130,7 @@ github__release_create() {
 ################################################################################
 # Issues on a repo, open and closed.
 # Arguments:
-#   owner/name
+#   Repo path (owner/name)
 # Outputs:
 #   A JSON array of {number, title, state} on stdout.
 ################################################################################
@@ -110,22 +139,10 @@ github__issues() {
 }
 
 ################################################################################
-# Counts issues with an exact title, optionally in one state.
-# Arguments:
-#   owner/name, title, state (OPEN or CLOSED; optional).
-# Outputs:
-#   The count on stdout.
-################################################################################
-github__issue_count() {
-  github__issues "$1" | jq --arg t "$2" --arg s "${3:-}" \
-    '[.[] | select(.title == $t and ($s == "" or .state == $s))] | length'
-}
-
-################################################################################
 # Deletes everything a test leaves on a repo: releases and tags, issues, and the distributor's
 # labels. With "runs", also cancels active workflow runs, waits for them, and deletes every run.
 # Arguments:
-#   owner/name, then "runs" (optional).
+#   Repo path (owner/name), then "runs" (optional).
 # Returns:
 #   0, or 1 when something couldn't be deleted.
 ################################################################################
@@ -143,7 +160,7 @@ github__wipe() {
   for x in $(gh issue list -R "$repo" --state all -L 1000 --json number -q '.[].number'); do
     gh issue delete "$x" -R "$repo" --yes || failed=true
   done
-  for x in rejected-release denied-repo-key prune-failing; do
+  for x in rejected-release denied-repo-key prune-failing archive-key; do
     gh label delete "$x" -R "$repo" --yes > /dev/null 2>&1 || true
   done
   if [[ ${2:-} == runs ]]; then

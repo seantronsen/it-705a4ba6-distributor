@@ -6,7 +6,7 @@
 _IT_STAGE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../ci/lib/suite.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/suite/suite.sh"
 
 ################################################################################
 # Runs CI tests as a stage. Their results and log go to the log.
@@ -32,8 +32,8 @@ stage__ci() {
 # Arguments:
 #   CI test name.
 # Outputs:
-#   The directory on stdout (the same path on the host).
+#   The directory on stdout.
 ################################################################################
 stage__artifacts() {
-  echo "$(suite__artifacts_dir)/$1"
+  echo "$(settings__get .run.artifacts_dir)/$1"
 }

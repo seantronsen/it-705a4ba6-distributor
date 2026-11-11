@@ -3,12 +3,12 @@
 # (~/.local/state/distributor-it/repos.yaml; IT_STATE overrides), which the run scripts and
 # destroy.sh read:
 #
-#   it-<random>-distributor     the distributor
-#   it-<random>-testbed         the testbed
-#   it-<random>-testbed-tools   the second service repo (its name starts with the testbed's)
+#   it-<random>-distributor     distributor
+#   it-<random>-testbed         service (real release builds)
+#   it-<random>-testbed-tools   fixture (crafted releases; its name starts with service's)
 #
 # They're public and empty; the runs fill them. Delete them with destroy.sh. Refused when your
-# config sets repos (the tests use those) or the state file already exists.
+# config sets a repo's remote or the state file already exists.
 set -uo pipefail
 
 # shellcheck source=lib/log.sh
@@ -20,9 +20,10 @@ source "$(dirname "$0")/lib/random.sh"
 
 main() {
   local file owner base try name taken failed=false
-  file=$(config__state_file)
-  if config__has .repos; then
-    log__error "$(config__file) sets repos, so the tests use those; remove them to create new ones"
+  file=$(config__file_state_repos)
+  if [[ ! -e $file ]] && config__has '.repos[] | .remote // empty'; then
+    log__error "$(config__file_user) sets remotes, so the tests use those; remove them to create" \
+      "new ones"
     failed=true
   fi
   if [[ -e $file ]]; then
@@ -53,8 +54,8 @@ main() {
   cat > "$file" << EOF
 # Written by init.sh; read by the run scripts and destroy.sh.
 distributor: $owner/$base-distributor
-testbed: $owner/$base-testbed
-service2: $owner/$base-testbed-tools
+service: $owner/$base-testbed
+fixture: $owner/$base-testbed-tools
 EOF
   for name in "$base-distributor" "$base-testbed" "$base-testbed-tools"; do
     gh repo create "$owner/$name" --public \
