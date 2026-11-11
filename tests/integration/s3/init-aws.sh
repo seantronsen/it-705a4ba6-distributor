@@ -14,6 +14,8 @@
 # the expiry and the suite's prune keep the bucket small (a run publishes a few MB), nothing
 # caps it. Refused when the state file already exists.
 set -uo pipefail
+# The AWS CLI pages any output on a terminal; nothing here needs it.
+export AWS_PAGER=""
 
 # shellcheck source=../lib/log.sh
 source "$(dirname "$0")/../lib/log.sh"
@@ -92,7 +94,7 @@ s3_init__bucket() {
     aws s3api put-bucket-policy --bucket "$name" --region "$region" \
       --policy "$(s3_init__bucket_policy "$name")" &&
     aws s3api put-bucket-lifecycle-configuration --bucket "$name" --region "$region" \
-      --lifecycle-configuration "$(s3_init__lifecycle)"
+      --lifecycle-configuration "$(s3_init__lifecycle)" > /dev/null
 }
 
 ################################################################################

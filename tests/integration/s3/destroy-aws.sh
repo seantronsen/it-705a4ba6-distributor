@@ -3,6 +3,8 @@
 # names: the bucket with every object in it, and the IAM user with its policy and access keys;
 # then deletes the state file. Uses your AWS CLI credentials (an admin; AWS_PROFILE picks one).
 set -uo pipefail
+# The AWS CLI pages any output on a terminal; nothing here needs it.
+export AWS_PAGER=""
 
 # shellcheck source=../lib/log.sh
 source "$(dirname "$0")/../lib/log.sh"
