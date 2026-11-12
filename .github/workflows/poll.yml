@@ -2,8 +2,6 @@
 name: poll
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   # Config changes (a new repo, a deny) take effect right away.
   push:
     paths:
