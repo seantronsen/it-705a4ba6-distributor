@@ -93,7 +93,8 @@ keys__create() {
 ################################################################################
 # Sets the archive key secret on the distributor. Secrets reach gh on stdin only.
 # Arguments:
-#   "valid" for the run's archive key, or "garbage" for an unusable one.
+#   "valid" for the run's archive key, or "locked" for it under a passphrase the distributor
+#   doesn't have (it imports, so check-keys passes, but can't sign).
 # Returns:
 #   0, or 1 when the secret wasn't set.
 ################################################################################
@@ -108,16 +109,42 @@ keys__set_archive_secret() {
 ################################################################################
 # The archive key secret's value.
 # Arguments:
-#   "valid" for the run's archive key, or "garbage" for an unusable one.
+#   "valid" or "locked" (see keys__set_archive_secret).
 # Outputs:
 #   The value on stdout.
 ################################################################################
 keys__archive_secret() {
-  if [[ $1 == garbage ]]; then
-    printf garbage
+  if [[ $1 == locked ]]; then
+    keys__locked_archive
   else
     keys__gpg --armor --export-secret-keys "$(keys__fpr archive)"
   fi
+}
+
+################################################################################
+# The run's archive key under a passphrase, set in a copy of the GnuPG home so the run's own
+# copy stays unprotected.
+# Outputs:
+#   The armored secret key on stdout.
+# Returns:
+#   0, or 1 when the passphrase couldn't be set.
+################################################################################
+keys__locked_archive() {
+  local home fpr status=0
+  fpr=$(keys__fpr archive)
+  home=$(mktemp -d) || return 1
+  cp -a "$(suite__share_dir)/gnupg/." "$home/"
+  if GNUPGHOME=$home gpg --batch --pinentry-mode loopback --passphrase distributor-it \
+    --change-passphrase "$fpr" 2> /dev/null; then
+    GNUPGHOME=$home gpg --batch --pinentry-mode loopback --passphrase distributor-it \
+      --armor --export-secret-keys "$fpr"
+  else
+    log__error "can't lock the archive key"
+    status=1
+  fi
+  GNUPGHOME=$home gpgconf --kill gpg-agent
+  rm -rf "$home"
+  return "$status"
 }
 
 ################################################################################

@@ -1,5 +1,6 @@
-# When prune can't sign (a broken archive key), polls keep failing without committing and an
-# issue stays open; once the key is fixed, prune succeeds and the issue closes.
+# When prune can't sign (an archive key under a passphrase the distributor doesn't have), polls
+# keep failing without committing and an issue stays open; once the key is fixed, prune succeeds
+# and the issue closes.
 
 setup() {
   source "$BATS_TEST_DIRNAME/../lib/lifecycle.sh"
@@ -22,7 +23,7 @@ setup() {
   fpr=$(keys__fpr service2)
   crafted__release "$repo" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
-  keys__set_archive_secret garbage
+  keys__set_archive_secret locked
   # Denying the key gives prune something to remove.
   run=$(distributor__push_config << EOF
 $(distributor__publishers)

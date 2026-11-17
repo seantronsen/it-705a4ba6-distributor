@@ -52,20 +52,28 @@ workflow__wait_next() {
 }
 
 ################################################################################
-# Dispatches a workflow and waits for it to finish.
+# Dispatches a workflow and waits for it to succeed.
 # Arguments:
 #   Workflow file.
 # Outputs:
 #   The run id on stdout.
 # Returns:
-#   0, or 1 when it didn't start or finish.
+#   0, or 1 when it didn't start, finish, or succeed.
 ################################################################################
 workflow__run() {
-  local before
+  local repo before id conclusion
+  repo=$(suite__distributor_repo)
   before=$(workflow__latest "$1")
-  if ! gh workflow run "$1" -R "$(suite__distributor_repo)" --ref main > /dev/null; then
+  if ! gh workflow run "$1" -R "$repo" --ref main > /dev/null; then
     log__error "can't dispatch $1"
     return 1
   fi
-  workflow__wait_next "$1" "$before"
+  id=$(workflow__wait_next "$1" "$before") || return 1
+  conclusion=$(gh api "repos/$repo/actions/runs/$id" -q .conclusion)
+  if [[ $conclusion != success ]]; then
+    log__error "$1 run $id: $conclusion"
+    github__log_failed "$repo" "$id"
+    return 1
+  fi
+  echo "$id"
 }

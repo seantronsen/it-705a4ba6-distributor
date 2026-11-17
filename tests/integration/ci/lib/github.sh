@@ -57,6 +57,16 @@ github__run_wait() {
 }
 
 ################################################################################
+# Logs a finished run's failed steps, for diagnosing it after the suite deletes its runs.
+# Arguments:
+#   owner/name, run id.
+################################################################################
+github__log_failed() {
+  log__error "run: https://github.com/$1/actions/runs/$2"
+  gh run view "$2" -R "$1" --log-failed 2>&1 | tail -n 40 >&2
+}
+
+################################################################################
 # Whether a workflow run has completed.
 # Arguments:
 #   owner/name, run id.
@@ -154,7 +164,7 @@ github__wipe() {
   for x in $(gh issue list -R "$repo" --state all -L 1000 --json number -q '.[].number'); do
     gh issue delete "$x" -R "$repo" --yes || failed=true
   done
-  for x in rejected-release denied-repo-key prune-failing; do
+  for x in rejected-release denied-repo-key prune-failing archive-key; do
     gh label delete "$x" -R "$repo" --yes > /dev/null 2>&1 || true
   done
   if [[ ${2:-} == runs ]]; then

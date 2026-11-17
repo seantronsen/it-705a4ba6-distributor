@@ -8,6 +8,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/git.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/github.sh"
 
 ################################################################################
 # Pushes the local testbed checkout (a copy at /src/testbed) to the throwaway repo, with its
@@ -51,29 +52,45 @@ testbed__release() {
   git__clone "$repo" "$dir/repo" || return 1
   git__push_tag "$dir/repo" "$repo" "$1" || return 1
   log__info "tagged $repo $1"
-  wait__until "$repo $1 released" testbed__release_state "$1"
+  wait__until "$repo $1 released" testbed__release_state "$1" "$SECONDS"
 }
 
 ################################################################################
-# Where a tag's release build stands.
+# Where a tag's release build stands. A release.yml GitHub can't parse (e.g. a reusable workflow
+# pinned to a commit that's gone) never starts a run for the tag.
+# Arguments:
+#   Tag, $SECONDS when it was pushed.
+# Returns:
+#   0 published, 1 not yet, 2 its release run finished without publishing it or never started.
+################################################################################
+testbed__release_state() {
+  local repo run id status conclusion
+  repo=$(suite__testbed_repo)
+  testbed__published "$1" && return 0
+  run=$(gh api "repos/$repo/actions/runs?event=push&branch=$1" \
+    -q '[.workflow_runs[] | select(.path == ".github/workflows/release.yml")][0] // empty
+      | "\(.id) \(.status) \(.conclusion // "")"')
+  read -r id status conclusion <<< "$run"
+  if [[ -z $id ]] && ((SECONDS - $2 > 300)); then
+    log__error "no release run for $1 after 5 minutes: is release.yml valid? https://github.com/$repo/actions"
+    return 2
+  fi
+  [[ $status == completed ]] || return 1
+  # The release is published within the run; this rereads it in case the first read lagged.
+  testbed__published "$1" && return 0
+  log__error "release run for $1: ${conclusion:-none}, release not published"
+  github__log_failed "$repo" "$id"
+  return 2
+}
+
+################################################################################
+# Whether a tag's release is published (not a draft).
 # Arguments:
 #   Tag.
 # Returns:
-#   0 published, 1 not yet, 2 its release run failed.
+#   0 when published, 1 otherwise.
 ################################################################################
-testbed__release_state() {
-  local repo conclusion
-  repo=$(suite__testbed_repo)
-  if [[ $(gh release view "$1" -R "$repo" --json isDraft -q .isDraft 2> /dev/null) == false ]]; then
-    return 0
-  fi
-  conclusion=$(gh api "repos/$repo/actions/runs?event=push&branch=$1" \
-    -q '[.workflow_runs[] | select(.name == "release")][0].conclusion // empty')
-  case $conclusion in
-    failure | cancelled | timed_out)
-      log__error "release run for $1: $conclusion"
-      return 2
-      ;;
-  esac
-  return 1
+testbed__published() {
+  [[ $(gh release view "$1" -R "$(suite__testbed_repo)" --json isDraft -q .isDraft \
+    2> /dev/null) == false ]]
 }
