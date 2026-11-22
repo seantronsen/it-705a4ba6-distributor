@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state.schema.json",
+  "title": "Distributor state (state/state.json)",
+  "description": "Every release processed and every package published or pruned.sh. See State in docs/spec.md.",
+  "type": "object",
+  "propertyNames": {
+    "description": "<owner>/<repo>@<tag>, or openchami-keyring@<version>.",
+    "pattern": "^([A-Za-z0-9-]+/[A-Za-z0-9._-]+|openchami-keyring)@.+$"
+  },
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["status", "at", "run"],
+    "properties": {
+      "status": { "enum": ["published", "skipped", "rejected"] },
+      "at": {
+        "description": "When it was processed, UTC, YYYY-MM-DDTHH:MM:SSZ.",
+        "type": "string",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+      },
+      "run": {
+        "description": "The workflow run that processed it.",
+        "type": "string",
+        "pattern": "^https://.+/actions/runs/[0-9]+$"
+      },
+      "repo_key": {
+        "description": "Fingerprint of the repo key that admitted it (published only); null for the keyring, which no repo key signs.",
+        "anyOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }]
+      },
+      "packages": {
+        "description": "Its packages (published only).",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format", "name", "version", "arch", "filename", "sha256", "status"],
+          "properties": {
+            "format": { "enum": ["rpm", "deb"] },
+            "name": { "type": "string", "minLength": 1 },
+            "version": {
+              "description": "major.minor.patch.",
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "arch": { "enum": ["x86_64", "aarch64", "noarch", "amd64", "arm64", "all"] },
+            "filename": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "status": { "enum": ["published", "pruned"] },
+            "reason": {
+              "description": "Why it was pruned: retention, or denied repo key <fingerprint>.",
+              "type": "string",
+              "minLength": 1
+            },
+            "signed_with": {
+              "description": "Fingerprint of the archive key that signed it (rpm only), for rekey.",
+              "$ref": "#/$defs/fingerprint"
+            }
+          },
+          "if": { "properties": { "status": { "const": "pruned" } } },
+          "then": { "required": ["reason"] }
+        }
+      },
+      "reasons": {
+        "description": "Why it was skipped or rejected.",
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "if": { "properties": { "status": { "const": "published" } } },
+    "then": { "required": ["repo_key", "packages"] },
+    "else": { "required": ["reasons"] }
+  },
+  "$defs": {
+    "fingerprint": {
+      "description": "A 40-hex-digit OpenPGP fingerprint, uppercase.",
+      "type": "string",
+      "pattern": "^[0-9A-F]{40}$"
+    }
+  }
+}
