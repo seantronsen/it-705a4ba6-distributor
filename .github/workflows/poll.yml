@@ -40,11 +40,8 @@ jobs:
         with:
           ref: ${{ steps.sha.outputs.sha }}
           persist-credentials: false
-      # pipx run needs nothing on PATH; the version comes from config/requirements.txt.
       - name: Validate the config
-        run: |
-          pipx run --spec "$(grep '^check-jsonschema==' config/requirements.txt)" check-jsonschema \
-            --schemafile config/repos.schema.json config/repos.yaml
+        run: scripts/validate.sh config/repos.schema.json config/repos.yaml
 
   # Fails the run on an archive key problem (expiring, or not keys/archive.asc) before anything is
   # published, and keeps the key issues in step.

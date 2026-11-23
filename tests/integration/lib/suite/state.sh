@@ -29,8 +29,8 @@ state__has() {
 }
 
 ################################################################################
-# Whether the state matches state/state.schema.json, checked with the distributor's pinned
-# check-jsonschema as its workflows run it.
+# Whether the state matches state/state.schema.json, checked as the distributor's workflows
+# check it.
 # Returns:
 #   0 when it does, 1 when it doesn't (the errors on stdout) or can't be read.
 ################################################################################
@@ -42,8 +42,7 @@ state__is_valid() {
     rm -f "$file"
     return 1
   fi
-  pipx run --spec "$(grep '^check-jsonschema==' /src/distributor/config/requirements.txt)" \
-    check-jsonschema --schemafile /src/distributor/state/state.schema.json "$file"
+  /src/distributor/scripts/validate.sh /src/distributor/state/state.schema.json "$file"
   status=$?
   rm -f "$file"
   ((status == 0)) || log__error "state.json on main doesn't match state/state.schema.json"

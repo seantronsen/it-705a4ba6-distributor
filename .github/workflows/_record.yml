@@ -31,29 +31,10 @@ jobs:
         with:
           pattern: ${{ inputs.artifacts }}
           path: ${{ runner.temp }}/record
-      # Applies the results as a delta onto the latest branch tip, checks it against the state
-      # schema, and pushes, retrying if another push lands first.
       - name: Commit state
-        env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           mapfile -t files < <(find "$RUNNER_TEMP/record" -name '*.json' | sort)
-          if [[ ${#files[@]} -eq 0 ]]; then echo 'Nothing to record.'; exit 0; fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          for attempt in 1 2 3; do
-            git fetch --quiet origin "$GITHUB_REF_NAME"
-            git reset --quiet --hard FETCH_HEAD
-            scripts/record.sh state "${files[@]}"
-            pipx run --spec "$(grep '^check-jsonschema==' config/requirements.txt)" check-jsonschema \
-              --schemafile state/state.schema.json state/state.json
-            git add state/
-            git diff --cached --quiet && { echo 'State unchanged.'; exit 0; }
-            git commit --quiet -m "state: ${GITHUB_WORKFLOW} ${RUN_URL}"
-            git push --quiet origin "HEAD:$GITHUB_REF_NAME" && exit 0
-            echo "Push failed (attempt $attempt); retrying on the latest state." >&2
-          done
-          exit 1
+          scripts/commit-state.sh "${files[@]}"
       - name: Open issues
         env:
           GITHUB_TOKEN: ${{ github.token }}

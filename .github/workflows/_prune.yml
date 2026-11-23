@@ -87,37 +87,15 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read     # the caller's previous run
+      contents: read    # the script
       issues: write     # the prune-failing issue
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      FAILED: ${{ needs.prune.result == 'failure' || needs.record.result == 'failure' }}
-      WORKFLOW_REF: ${{ github.workflow_ref }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      TITLE: Prune failing
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Open or close the issue
-        run: |
-          set -euo pipefail
-          issue=$(gh issue list --state open --label prune-failing --json number,title \
-            --jq '[.[] | select(.title == env.TITLE)][0].number // empty')
-          if [[ "$FAILED" != true ]]; then
-            [[ -z "$issue" ]] || gh issue close "$issue" --comment "Prune succeeded again ([run](${RUN_URL}))."
-            exit 0
-          fi
-          # The caller's workflow file (e.g. .github/workflows/poll.yml), from owner/repo/<path>@<ref>.
-          workflow=${WORKFLOW_REF#"$GH_REPO"/}
-          workflow=${workflow%@*}
-          previous=$(gh api "repos/${GH_REPO}/actions/workflows/${workflow##*/}/runs?status=completed&per_page=1" \
-            --jq '.workflow_runs[0].id // empty')
-          if [[ -z "$previous" ]] || ! gh api --paginate "repos/${GH_REPO}/actions/runs/${previous}/jobs" \
-              --jq '.jobs[] | select((.name | startswith("prune / ")) and .conclusion == "failure") | .id' | grep -q .; then
-            echo "::warning::Prune failed; the next run retries it."
-            exit 0
-          fi
-          if [[ -z "$issue" ]]; then
-            gh label create prune-failing --force > /dev/null
-            gh issue create --title "$TITLE" --label prune-failing \
-              --body "Prune failed in two runs in a row. Latest: ${RUN_URL}"
-          fi
-          exit 1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FAILED: ${{ needs.prune.result == 'failure' || needs.record.result == 'failure' }}
+        run: scripts/report-prune.sh "$FAILED"

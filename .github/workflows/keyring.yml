@@ -21,9 +21,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    env:
-      NFPM_VERSION: 2.48.0
-      NFPM_SHA256: 6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,12 +28,7 @@ jobs:
           persist-credentials: false
       - name: Install nfpm
         run: |
-          set -euo pipefail
-          tgz=nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz
-          curl -fsSL -o "$RUNNER_TEMP/$tgz" "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/$tgz"
-          echo "$NFPM_SHA256  $RUNNER_TEMP/$tgz" | sha256sum -c --quiet
-          mkdir -p "$RUNNER_TEMP/bin"
-          tar -xzf "$RUNNER_TEMP/$tgz" -C "$RUNNER_TEMP/bin" nfpm
+          scripts/install-nfpm.sh "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Build the keyring
         env:
