@@ -17,7 +17,7 @@ teardown() {
   keys=$(s3__release_keys "$repo" v1.0.0)
   for key in $keys; do wait__check "$key: on the bucket" s3__has_object "$key"; done
   distributor__push_config > /dev/null << EOF
-$(distributor__target)
+$(distributor__settings)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):

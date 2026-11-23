@@ -6,9 +6,20 @@
 _LIB_REPO_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/target.sh"
 
 RPM_COMPRESS=(--general-compress-type=gz --no-database --quiet)
+
+################################################################################
+# The deb architectures with their own Packages index: the config's, but `all`, whose packages
+# every index lists.
+# Outputs:
+#   The architectures on stdout, one per line.
+################################################################################
+repo__deb_arches() {
+  config__get .architectures.deb | jq -r '.[] | select(. != "all")'
+}
 
 ################################################################################
 # Rebuilds the rpm metadata: starts from the target's repodata, drops the entries for the files
@@ -116,7 +127,7 @@ repo__apt_metadata() {
   local dist=$out/dists/$SUITE
   mkdir -p "$new/pool"
   (cd "$new" && apt-ftparchive packages pool 2> /dev/null) > "$work/new.Packages"
-  for arch in "${DEB_ARCHES[@]}"; do
+  for arch in $(repo__deb_arches); do
     local bin=$dist/main/binary-$arch
     mkdir -p "$bin"
     target__get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
@@ -132,7 +143,7 @@ repo__apt_metadata() {
     -o APT::FTPArchive::Release::Label=OpenCHAMI \
     -o APT::FTPArchive::Release::Suite="$SUITE" \
     -o APT::FTPArchive::Release::Codename="$SUITE" \
-    -o APT::FTPArchive::Release::Architectures="${DEB_ARCHES[*]}" \
+    -o APT::FTPArchive::Release::Architectures="$(repo__deb_arches | xargs)" \
     -o APT::FTPArchive::Release::Components=main \
     release "dists/$SUITE") > "$work/Release"
   mv "$work/Release" "$dist/Release"
@@ -158,7 +169,7 @@ repo__sign_apt() {
 ################################################################################
 repo__write_apt_metadata() {
   local dist=$1/dists/$SUITE arch f
-  for arch in "${DEB_ARCHES[@]}"; do
+  for arch in $(repo__deb_arches); do
     for f in Packages Packages.gz; do
       target__put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
     done

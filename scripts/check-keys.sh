@@ -3,13 +3,14 @@
 #
 #   check-keys.sh
 #
-# Fails when ARCHIVE_GPG_KEY isn't keys/archive.asc (keys__init_archive) or expires within
-# WARN_DAYS, and keeps the "Archive key expiring" and "Archive key switch due" issues open or
+# Fails when ARCHIVE_GPG_KEY isn't keys/archive.asc (keys__init_archive) or expires within the
+# config's archive-key.warn-days, and keeps the "Archive key expiring" and "Archive key switch due" issues open or
 # closed to match. Fails without ARCHIVE_GPG_KEY, so a poll never runs without the key.
+source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/keys.sh"
 
-WARN_DAYS=30
+WARN_DAYS=$(config__get '.["archive-key"]["warn-days"]')
 EXPIRING="Archive key expiring"
 SWITCH_DUE="Archive key switch due"
 

@@ -5,6 +5,7 @@
 _LIB_PACKAGE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 ################################################################################
 # A package file's metadata. The version is the upstream version: rpm VERSION, or deb Version
@@ -38,17 +39,14 @@ package__info() {
 }
 
 ################################################################################
-# Whether the distributor publishes an architecture.
+# Whether the distributor publishes an architecture (the config's architectures).
 # Arguments:
 #   <format> <arch>
 # Returns:
 #   0 when it does, 1 otherwise.
 ################################################################################
 package__is_supported_arch() {
-  case $1:$2 in
-    rpm:x86_64 | rpm:aarch64 | rpm:noarch | deb:amd64 | deb:arm64 | deb:all) return 0 ;;
-    *) return 1 ;;
-  esac
+  config__get ".architectures.$1" | jq -e --arg a "$2" 'any(. == $a)' > /dev/null
 }
 
 ################################################################################

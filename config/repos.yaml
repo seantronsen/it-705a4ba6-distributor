@@ -44,6 +44,28 @@ target:
   s3: {bucket: openchami-packages, region: us-east-1, metadata-max-age: 300}
 
 # -------------------------------------------------------------------------
+# Publishing
+# -------------------------------------------------------------------------
+
+# The architectures published, per format (required). A release's packages of
+# any other architecture are left out of it. Each deb architecture but `all`
+# gets its own Packages index; `all` packages are listed in every one.
+architectures:
+  rpm: [x86_64, aarch64, noarch]
+  deb: [amd64, arm64, all]
+
+# The most releases one poll admits, oldest first (required; 1 to 256, GitHub's
+# limit on a job matrix). The rest wait for the next polls.
+max-releases: 256
+
+# Days before the archive key expires that polls start failing and the
+# "Archive key expiring" issue opens; also the grace period after
+# keys/archive-next.asc is committed before the "Archive key switch due" issue
+# opens (required).
+archive-key:
+  warn-days: 30
+
+# -------------------------------------------------------------------------
 # Publishers
 # -------------------------------------------------------------------------
 

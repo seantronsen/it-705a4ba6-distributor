@@ -5,7 +5,7 @@
   "description": "Who may publish, and the service repos to poll. See the comments in config/repos.yaml.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["target", "publishers", "repos"],
+  "required": ["target", "architectures", "max-releases", "archive-key", "publishers", "repos"],
   "properties": {
     "target": {
       "description": "Where to publish.",
@@ -31,6 +31,44 @@
               "minimum": 0
             }
           }
+        }
+      }
+    },
+    "architectures": {
+      "description": "The architectures published, per format.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rpm", "deb"],
+      "properties": {
+        "rpm": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["x86_64", "aarch64", "noarch"] }
+        },
+        "deb": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["amd64", "arm64", "all"] }
+        }
+      }
+    },
+    "max-releases": {
+      "description": "The most releases one poll admits (GitHub caps a job matrix at 256).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "archive-key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warn-days"],
+      "properties": {
+        "warn-days": {
+          "description": "Days of warning before the archive key expires, and the grace period before a key switch is due.",
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

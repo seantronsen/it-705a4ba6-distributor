@@ -17,7 +17,7 @@ teardown() {
   crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   # No publishers, and a key the schema doesn't know.
   run=$(distributor__push_config << EOF
-$(distributor__target)
+$(distributor__settings)
 repos:
   $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')

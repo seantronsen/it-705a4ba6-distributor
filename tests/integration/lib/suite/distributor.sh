@@ -22,17 +22,24 @@ distributor__publishers() {
 }
 
 ################################################################################
-# The target block: the test bucket.
+# The settings besides publishers and repos: the test bucket as the target, and the live
+# config's values for the rest.
 # Outputs:
 #   config/repos.yaml lines on stdout.
 ################################################################################
-distributor__target() {
+distributor__settings() {
   cat << EOF
 target:
   s3:
     bucket: $(settings__get .s3.bucket)
     region: $(settings__get .s3.region)
     metadata-max-age: $(settings__get .s3.metadata_max_age)
+architectures:
+  rpm: [x86_64, aarch64, noarch]
+  deb: [amd64, arm64, all]
+max-releases: 256
+archive-key:
+  warn-days: 30
 EOF
 }
 
@@ -44,7 +51,7 @@ EOF
 ################################################################################
 distributor__default_config() {
   cat << EOF
-$(distributor__target)
+$(distributor__settings)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):

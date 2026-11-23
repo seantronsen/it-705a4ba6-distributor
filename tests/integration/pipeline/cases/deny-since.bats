@@ -20,7 +20,7 @@ teardown() {
   poll__run > /dev/null
   since=$(state__get | jq -r --arg k "$repo@v1.1.0" '.[$k].at')
   distributor__push_config > /dev/null << EOF
-$(distributor__target)
+$(distributor__settings)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):
