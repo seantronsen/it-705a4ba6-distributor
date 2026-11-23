@@ -8,8 +8,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/target.sh"
 
 ################################################################################
-# Sets up a private GNUPGHOME holding the archive secret key. Exits when ARCHIVE_GPG_KEY is unset,
-# doesn't import, isn't exactly one secret key, or isn't keys/archive.asc (when committed).
+# Sets up a private GNUPGHOME holding the archive secret key, removed again when the script exits
+# (keys__archive_unload). Exits when ARCHIVE_GPG_KEY is unset, doesn't import, isn't exactly one
+# secret key, or isn't keys/archive.asc (when committed).
 # Globals:
 #   ARCHIVE_GPG_KEY (armored or base64), ARCHIVE_GPG_PASSPHRASE; sets and exports GNUPGHOME,
 #   ARCHIVE_FPR, and ARCHIVE_PUB (the exported public key's file).
@@ -18,6 +19,7 @@ keys__archive_load() {
   local fprs
   GNUPGHOME=$(mktemp -d)
   export GNUPGHOME
+  trap keys__archive_unload EXIT
   chmod 700 "$GNUPGHOME"
   printf 'pinentry-mode loopback\ntrust-model always\n' > "$GNUPGHOME/gpg.conf"
   if [[ -n ${ARCHIVE_GPG_PASSPHRASE:-} ]]; then
@@ -46,6 +48,20 @@ keys__archive_load() {
     [[ $(keys__file_fingerprint "$ROOT/keys/archive.asc") == "$ARCHIVE_FPR" ]] \
       || log__fatal "ARCHIVE_GPG_KEY ($ARCHIVE_FPR) isn't keys/archive.asc"
   fi
+}
+
+################################################################################
+# Removes the archive key from the runner: stops the gpg-agent holding it unlocked, then shreds
+# and deletes GNUPGHOME (the secret key, and the passphrase file when there is one). Runs on exit
+# (keys__archive_load sets the trap).
+# Globals:
+#   GNUPGHOME (keys__archive_load)
+################################################################################
+keys__archive_unload() {
+  [[ -n ${GNUPGHOME:-} && -d $GNUPGHOME ]] || return 0
+  gpgconf --kill gpg-agent 2> /dev/null || true
+  find "$GNUPGHOME" -type f -exec shred -u {} + 2> /dev/null || true
+  rm -rf "$GNUPGHOME"
 }
 
 ################################################################################
