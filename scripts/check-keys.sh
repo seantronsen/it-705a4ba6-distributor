@@ -3,7 +3,7 @@
 #
 #   check-keys.sh
 #
-# Fails when ARCHIVE_GPG_KEY isn't keys/archive.asc (keys__init_archive) or expires within the
+# Fails when ARCHIVE_GPG_KEY isn't keys/archive.asc (keys__archive_load) or expires within the
 # config's archive_key.warn_days, and keeps the "Archive key expiring" and "Archive key switch
 # due" issues open or closed to match. Fails without ARCHIVE_GPG_KEY, so a poll never runs
 # without the key.
@@ -38,12 +38,12 @@ check_expiry() {
   days=$(days_to_expiry)
   if [[ -n $days && $days -lt $warn_days ]]; then
     log__info "check-keys: archive key $ARCHIVE_FPR expires in $days day(s)"
-    github__ensure_issue "$EXPIRING" archive-key \
+    github__issue_ensure "$EXPIRING" archive-key \
       "Archive key \`$ARCHIVE_FPR\` expires in $days day(s). Rotate it (spec-deferred.md, Archive \
 key management). Run: $(github__run_url)"
     return 1
   fi
-  github__close_issue "$EXPIRING" archive-key \
+  github__issue_close "$EXPIRING" archive-key \
     "The archive key no longer expires within $warn_days days."
 }
 
@@ -69,10 +69,10 @@ check_switch_due() {
   local warn_days=$1 days
   days=$(days_since_next_key)
   if [[ -z $days ]]; then
-    github__close_issue "$SWITCH_DUE" archive-key \
+    github__issue_close "$SWITCH_DUE" archive-key \
       "keys/archive-next.asc is gone: the switch is done."
   elif [[ $days -ge $warn_days ]]; then
-    github__ensure_issue "$SWITCH_DUE" archive-key \
+    github__issue_ensure "$SWITCH_DUE" archive-key \
       "\`keys/archive-next.asc\` was committed $days days ago, so clients have had the keyring \
 carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, step 3)."
   fi
@@ -84,7 +84,7 @@ carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, s
 main() {
   local warn_days
   warn_days=$(config__get .archive_key.warn_days)
-  keys__init_archive
+  keys__archive_load
   check_switch_due "$warn_days"
   check_expiry "$warn_days"
   log__info "check-keys: archive key $ARCHIVE_FPR OK"

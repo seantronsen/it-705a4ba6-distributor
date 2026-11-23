@@ -18,7 +18,7 @@ main() {
   max=$(config__get .max_releases)
   new=$(mktemp)
   while IFS= read -r repo; do
-    releases=$(github__releases "$repo")
+    releases=$(github__release_list "$repo")
     state__json | base__jq -c --arg repo "$repo" --argjson rel "$releases" \
       'import "discover" as discover; discover::new($repo; $rel)' >> "$new"
   done < <(config__get .repos | jq -r 'keys[]')

@@ -45,7 +45,7 @@ excludes() {
     if [[ $fmt == rpm ]]; then
       echo "$filename"
     else
-      rel=$(package__path deb "$name" "$filename")
+      rel=$(package__target_path deb "$name" "$filename")
       echo "${rel#*/}"
     fi
   done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$new")
@@ -59,11 +59,11 @@ excludes() {
 stage_packages() {
   local fmt=$1 new=$2 dir=$3 name filename path rel dest
   while IFS=$'\t' read -r name filename path; do
-    rel=$(package__path "$fmt" "$name" "$filename")
+    rel=$(package__target_path "$fmt" "$name" "$filename")
     dest=$dir/${rel#*/}
     mkdir -p "$(dirname "$dest")"
     cp "$path" "$dest"
-    if [[ $fmt == rpm ]]; then keys__sign_rpm "$dest"; fi
+    if [[ $fmt == rpm ]]; then keys__rpm_sign "$dest"; fi
   done < <(jq -r '.[] | [.name, .filename, .path] | @tsv' <<< "$new")
 }
 
@@ -75,9 +75,9 @@ stage_packages() {
 upload_packages() {
   local fmt=$1 new=$2 dir=$3 name filename rel
   jq -r '.[] | [.name, .filename] | @tsv' <<< "$new" | while IFS=$'\t' read -r name filename; do
-    rel=$(package__path "$fmt" "$name" "$filename")
+    rel=$(package__target_path "$fmt" "$name" "$filename")
     printf '%s\0%s\0' "$dir/${rel#*/}" "$rel"
-  done | xargs -0 -n 2 -P 8 bash -c 'source "$0"; target__put "$1" "$2"' \
+  done | xargs -0 -n 2 -P 8 bash -c 'source "$0"; target__file_put "$1" "$2"' \
     "$ROOT/scripts/lib/target.sh"
 }
 
@@ -102,7 +102,7 @@ main() {
   fi
   log__info "publish $fmt: $(jq length <<< "$new") new"
 
-  keys__init_archive
+  keys__archive_load
   jq -n --arg fmt "$fmt" --arg fpr "$ARCHIVE_FPR" --argjson new "$new" '{format: $fmt, patches: [
     $new[] | {release, filename, status: "published"}
     + (if $fmt == "rpm" then {signed_with: $fpr} else {} end)]}' > "$delta"
@@ -111,17 +111,17 @@ main() {
   excludes "$fmt" "$new" > "$work/excludes"
   stage_packages "$fmt" "$new" "$work/new"
   if [[ $fmt == rpm ]]; then
-    meta=$(repo__rpm_metadata "$work" "$work/new" "$work/excludes")
+    meta=$(repo__rpm_metadata_build "$work" "$work/new" "$work/excludes")
   else
-    meta=$(repo__apt_metadata "$work" "$work/new" "$work/excludes")
+    meta=$(repo__apt_metadata_build "$work" "$work/new" "$work/excludes")
   fi
   upload_packages "$fmt" "$new" "$work/new"
   if [[ $fmt == rpm ]]; then
-    repo__write_rpm_metadata "$meta"
+    repo__rpm_metadata_write "$meta"
   else
-    repo__write_apt_metadata "$meta"
+    repo__apt_metadata_write "$meta"
   fi
-  keys__publish
+  keys__public_publish
   log__info "publish $fmt: done ($(target__url))"
 }
 

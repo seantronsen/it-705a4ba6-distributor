@@ -4,7 +4,7 @@ import "state" as state;
 
 # Published packages admitted with a denied repo key (all, or admitted at or after `since`),
 # from state (input): [{release, repo, format, name, filename, fingerprint}]
-def packages($cfg):
+def package_list($cfg):
   [state::published_packages[]
     | . as $p
     | (($cfg[$p.repo].deny // [])[]

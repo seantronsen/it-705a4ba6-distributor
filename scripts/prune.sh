@@ -25,7 +25,7 @@ source "$(dirname "$0")/lib/target.sh"
 ################################################################################
 denied_packages() {
   state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
-    'import "deny" as deny; deny::packages($cfg) | map(select(.format == $fmt))'
+    'import "deny" as deny; deny::package_list($cfg) | map(select(.format == $fmt))'
 }
 
 ################################################################################
@@ -68,7 +68,7 @@ write_delta() {
 orphan_paths() {
   local fmt=$1 pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-  comm -23 <(target__find "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
+  comm -23 <(target__file_list_tree "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
     'import "prune" as prune; prune::published_paths($fmt)' | sort)
 }
 
@@ -86,7 +86,7 @@ excludes() {
     if [[ $fmt == rpm ]]; then
       echo "$filename"
     else
-      f=$(package__path deb "$name" "$filename")
+      f=$(package__target_path deb "$name" "$filename")
       echo "${f#*/}"
     fi
   done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
@@ -104,11 +104,11 @@ rewrite_metadata() {
   local fmt=$1 excludes=$2 work meta
   work=$(mktemp -d)
   if [[ $fmt == rpm ]]; then
-    meta=$(repo__rpm_metadata "$work" "$work/new" "$excludes")
-    repo__write_rpm_metadata "$meta"
+    meta=$(repo__rpm_metadata_build "$work" "$work/new" "$excludes")
+    repo__rpm_metadata_write "$meta"
   else
-    meta=$(repo__apt_metadata "$work" "$work/new" "$excludes")
-    repo__write_apt_metadata "$meta"
+    meta=$(repo__apt_metadata_build "$work" "$work/new" "$excludes")
+    repo__apt_metadata_write "$meta"
   fi
 }
 
@@ -121,9 +121,9 @@ delete_files() {
   local fmt=$1 remove=$2 name filename f
   shift 2
   while IFS=$'\t' read -r name filename; do
-    target__rm "$(package__path "$fmt" "$name" "$filename")"
+    target__file_delete "$(package__target_path "$fmt" "$name" "$filename")"
   done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
-  for f in "$@"; do target__rm "$f"; done
+  for f in "$@"; do target__file_delete "$f"; done
 }
 
 ################################################################################
@@ -150,7 +150,7 @@ main() {
   log__info "prune $fmt: $(jq length <<< "$pruned") by retention," \
     "$(jq length <<< "$denied") for a denied repo key, ${#orphans[@]} not in state"
 
-  keys__init_archive
+  keys__archive_load
   excludes_file=$(mktemp)
   excludes "$fmt" "$remove" "${orphans[@]}" > "$excludes_file"
   rewrite_metadata "$fmt" "$excludes_file"

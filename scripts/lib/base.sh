@@ -13,7 +13,7 @@
 _LIB_BASE_SH=1
 
 set -euo pipefail
-# set -e in $(...) too: e.g. a signing failure inside meta=$(repo__rpm_metadata ...) fails the
+# set -e in $(...) too: e.g. a signing failure inside meta=$(repo__rpm_metadata_build ...) fails the
 # script instead of publishing an empty signature.
 shopt -s inherit_errexit
 
@@ -35,7 +35,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # Outputs:
 #   UTC, YYYY-MM-DDTHH:MM:SSZ, on stdout.
 ################################################################################
-base__now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+base__timestamp_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 ################################################################################
 # jq with the modules in scripts/jq/ available, e.g. `import "state" as state;`.

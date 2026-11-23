@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Repository metadata updates for publish, prune, and rekey, without downloading old packages.
-# Needs keys__init_archive first.
+# Needs keys__archive_load first.
 
 [[ -n ${_LIB_REPO_SH:-} ]] && return 0
 _LIB_REPO_SH=1
@@ -17,7 +17,7 @@ RPM_COMPRESS=(--general-compress-type=gz --no-database --quiet)
 # Outputs:
 #   The architectures on stdout, one per line.
 ################################################################################
-repo__deb_arches() {
+repo__deb_architectures() {
   config__get .architectures.deb | jq -r '.[] | select(. != "all")'
 }
 
@@ -30,13 +30,13 @@ repo__deb_arches() {
 # Outputs:
 #   The directory holding the new repodata/ on stdout.
 ################################################################################
-repo__rpm_metadata() {
+repo__rpm_metadata_build() {
   local work=$1 new=$2 excludes=$3 old=$1/rpm-old have_old=false have_new=false href f
   mkdir -p "$old/repodata" "$new/packages"
-  if target__get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
+  if target__file_get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
     have_old=true
     while IFS= read -r href; do
-      target__get "rpm/$href" "$old/$href" \
+      target__file_get "rpm/$href" "$old/$href" \
         || log__fatal "rpm/$href is referenced by repomd.xml but missing"
     done < <(grep -o 'href="repodata/[^"]*"' "$old/repodata/repomd.xml" | cut -d'"' -f2)
     if [[ -s $excludes ]]; then
@@ -75,18 +75,18 @@ repo__rpm_metadata() {
 # Arguments:
 #   <dir holding repodata/>
 ################################################################################
-repo__write_rpm_metadata() {
+repo__rpm_metadata_write() {
   local dir=$1 f
   for f in "$dir"/repodata/*; do
     case ${f##*/} in
       repomd.xml | repomd.xml.asc) ;;
-      *) target__put "$f" "rpm/repodata/${f##*/}" ;;
+      *) target__file_put "$f" "rpm/repodata/${f##*/}" ;;
     esac
   done
-  target__put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
-  target__put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
-  for f in $(target__ls rpm/repodata); do
-    [[ -e $dir/repodata/$f ]] || target__rm "rpm/repodata/$f"
+  target__file_put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
+  target__file_put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
+  for f in $(target__file_list rpm/repodata); do
+    [[ -e $dir/repodata/$f ]] || target__file_delete "rpm/repodata/$f"
   done
 }
 
@@ -100,7 +100,7 @@ repo__write_rpm_metadata() {
 # Outputs:
 #   The kept stanzas on stdout.
 ################################################################################
-repo__apt_filter() {
+repo__apt_packages_filter() {
   awk -v ex="$1" -v arch="$2" '
     BEGIN { while ((getline l < ex) > 0) skip[l] = 1; RS = ""; ORS = "\n\n" }
     {
@@ -122,19 +122,19 @@ repo__apt_filter() {
 # Outputs:
 #   The directory holding the new dists/ on stdout.
 ################################################################################
-repo__apt_metadata() {
+repo__apt_metadata_build() {
   local work=$1 new=$2 excludes=$3 out=$1/apt-out arch
   local dist=$out/dists/$SUITE
   mkdir -p "$new/pool"
   (cd "$new" && apt-ftparchive packages pool 2> /dev/null) > "$work/new.Packages"
-  for arch in $(repo__deb_arches); do
+  for arch in $(repo__deb_architectures); do
     local bin=$dist/main/binary-$arch
     mkdir -p "$bin"
-    target__get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
+    target__file_get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
       || : > "$work/old.Packages.$arch"
     {
-      repo__apt_filter "$excludes" "" < "$work/old.Packages.$arch"
-      repo__apt_filter /dev/null "$arch" < "$work/new.Packages"
+      repo__apt_packages_filter "$excludes" "" < "$work/old.Packages.$arch"
+      repo__apt_packages_filter /dev/null "$arch" < "$work/new.Packages"
     } > "$bin/Packages"
     gzip -9nc "$bin/Packages" > "$bin/Packages.gz"
   done
@@ -143,11 +143,11 @@ repo__apt_metadata() {
     -o APT::FTPArchive::Release::Label=OpenCHAMI \
     -o APT::FTPArchive::Release::Suite="$SUITE" \
     -o APT::FTPArchive::Release::Codename="$SUITE" \
-    -o APT::FTPArchive::Release::Architectures="$(repo__deb_arches | xargs)" \
+    -o APT::FTPArchive::Release::Architectures="$(repo__deb_architectures | xargs)" \
     -o APT::FTPArchive::Release::Components=main \
     release "dists/$SUITE") > "$work/Release"
   mv "$work/Release" "$dist/Release"
-  repo__sign_apt "$dist"
+  repo__apt_release_sign "$dist"
   echo "$out"
 }
 
@@ -156,7 +156,7 @@ repo__apt_metadata() {
 # Arguments:
 #   <dist dir holding Release>
 ################################################################################
-repo__sign_apt() {
+repo__apt_release_sign() {
   rm -f "$1/InRelease" "$1/Release.gpg"
   gpg --batch --clearsign -o "$1/InRelease" "$1/Release"
   gpg --batch --armor --detach-sign -o "$1/Release.gpg" "$1/Release"
@@ -167,14 +167,14 @@ repo__sign_apt() {
 # Arguments:
 #   <dir holding dists/>
 ################################################################################
-repo__write_apt_metadata() {
+repo__apt_metadata_write() {
   local dist=$1/dists/$SUITE arch f
-  for arch in $(repo__deb_arches); do
+  for arch in $(repo__deb_architectures); do
     for f in Packages Packages.gz; do
-      target__put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
+      target__file_put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
     done
   done
   for f in Release Release.gpg InRelease; do
-    target__put "$dist/$f" "deb/dists/$SUITE/$f"
+    target__file_put "$dist/$f" "deb/dists/$SUITE/$f"
   done
 }

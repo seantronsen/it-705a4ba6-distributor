@@ -54,7 +54,7 @@ target__cache_control() {
 # Returns:
 #   0, or 1 when the file is absent.
 ################################################################################
-target__get() {
+target__file_get() {
   local err
   mkdir -p "$(dirname "$2")"
   if ! err=$(target__aws s3api get-object --bucket "$(config__get .target.s3.bucket)" \
@@ -69,7 +69,7 @@ target__get() {
 # Arguments:
 #   <src> <path>
 ################################################################################
-target__put() {
+target__file_put() {
   target__aws s3 cp --only-show-errors --cache-control "$(target__cache_control "$2")" "$1" \
     "$(target__url)/$2"
 }
@@ -79,7 +79,7 @@ target__put() {
 # Arguments:
 #   <path>
 ################################################################################
-target__rm() {
+target__file_delete() {
   target__aws s3 rm --only-show-errors "$(target__url)/$1"
 }
 
@@ -90,7 +90,7 @@ target__rm() {
 # Outputs:
 #   Their names on stdout, one per line.
 ################################################################################
-target__ls() {
+target__file_list() {
   target__aws s3api list-objects-v2 --bucket "$(config__get .target.s3.bucket)" --prefix "$1/" \
     --delimiter / --output json \
     | jq -r --arg p "$1/" '(.Contents // [])[].Key | ltrimstr($p)'
@@ -103,7 +103,7 @@ target__ls() {
 # Outputs:
 #   Their paths on stdout, one per line.
 ################################################################################
-target__find() {
+target__file_list_tree() {
   target__aws s3api list-objects-v2 --bucket "$(config__get .target.s3.bucket)" --prefix "$1/" \
     --output json \
     | jq -r '(.Contents // [])[].Key'

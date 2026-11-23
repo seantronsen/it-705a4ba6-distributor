@@ -29,7 +29,7 @@ next_version() {
 # Exports every key to package (keys/, or the archive public key without keys/archive.asc)
 # into one armored file.
 # Globals:
-#   ARCHIVE_PUB (keys__init_archive)
+#   ARCHIVE_PUB (keys__archive_load)
 # Arguments:
 #   <dest>
 ################################################################################
@@ -51,10 +51,11 @@ export_keys() {
 write_result() {
   local version=$1 files=$2 dest=$3 f pkgs='[]'
   for f in "$files"/*; do
-    pkgs=$(jq -c --argjson i "$(package__info "$f")" --arg sha "$(sha256sum "$f" | cut -d' ' -f1)" \
+    pkgs=$(jq -c --argjson i "$(package__metadata "$f")" \
+      --arg sha "$(sha256sum "$f" | cut -d' ' -f1)" \
       '. + [$i + {sha256: $sha, path: "files/\($i.filename)", status: "published"}]' <<< "$pkgs")
   done
-  jq -n --arg repo "$KEYRING" --arg v "$version" --arg at "$(base__now)" \
+  jq -n --arg repo "$KEYRING" --arg v "$version" --arg at "$(base__timestamp_utc)" \
     --arg run "$(github__run_url)" --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo,
       tag: $v, status: "published", at: $at, run: $run, repo_key: null, reasons: [],
       packages: $p}' > "$dest"
@@ -69,7 +70,7 @@ main() {
   local out version fmt
   mkdir -p "$1/files"
   out=$(cd "$1" && pwd)
-  keys__init_archive
+  keys__archive_load
   version=$(next_version)
   mkdir -p "$ROOT/keyring/build"
   export_keys "$ROOT/keyring/build/keys.asc"

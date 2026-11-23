@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/target.sh"
 #   ARCHIVE_GPG_KEY (armored or base64), ARCHIVE_GPG_PASSPHRASE; sets and exports GNUPGHOME,
 #   ARCHIVE_FPR, and ARCHIVE_PUB (the exported public key's file).
 ################################################################################
-keys__init_archive() {
+keys__archive_load() {
   local fprs
   GNUPGHOME=$(mktemp -d)
   export GNUPGHOME
@@ -43,7 +43,7 @@ keys__init_archive() {
 
   # The key must be the committed one (keys/archive.asc), e.g. not half through a switch.
   if [[ -f $ROOT/keys/archive.asc ]]; then
-    [[ $(keys__file_fpr "$ROOT/keys/archive.asc") == "$ARCHIVE_FPR" ]] \
+    [[ $(keys__file_fingerprint "$ROOT/keys/archive.asc") == "$ARCHIVE_FPR" ]] \
       || log__fatal "ARCHIVE_GPG_KEY ($ARCHIVE_FPR) isn't keys/archive.asc"
   fi
 }
@@ -55,18 +55,18 @@ keys__init_archive() {
 # Outputs:
 #   The fingerprint on stdout.
 ################################################################################
-keys__file_fpr() {
+keys__file_fingerprint() {
   gpg --batch --with-colons --show-keys "$1" 2> /dev/null | awk -F: '$1=="fpr" {print $10; exit}'
 }
 
 ################################################################################
 # Signs rpms with the archive key.
 # Globals:
-#   ARCHIVE_FPR, GNUPGHOME (keys__init_archive)
+#   ARCHIVE_FPR, GNUPGHOME (keys__archive_load)
 # Arguments:
 #   <rpm>...
 ################################################################################
-keys__sign_rpm() {
+keys__rpm_sign() {
   # Ubuntu's rpm macros point __gpg at a path that may not exist; use the gpg on PATH.
   rpmsign --addsign --define "__gpg $(command -v gpg)" --define "_gpg_name $ARCHIVE_FPR" \
     --define "_gpg_path $GNUPGHOME" "$@" > /dev/null
@@ -77,9 +77,9 @@ keys__sign_rpm() {
 # Arguments:
 #   <rpm>...
 ################################################################################
-keys__resign_rpm() {
+keys__rpm_resign() {
   rpmsign --delsign "$@" > /dev/null
-  keys__sign_rpm "$@"
+  keys__rpm_sign "$@"
 }
 
 ################################################################################
@@ -87,16 +87,16 @@ keys__resign_rpm() {
 # archive-previous.asc, revoked-<fpr>.asc) and removes keys no longer there. Without a committed
 # keys/archive.asc, publishes the archive public key alone.
 # Globals:
-#   ARCHIVE_PUB (keys__init_archive)
+#   ARCHIVE_PUB (keys__archive_load)
 ################################################################################
-keys__publish() {
+keys__public_publish() {
   local f
   if [[ ! -f $ROOT/keys/archive.asc ]]; then
-    target__put "$ARCHIVE_PUB" keys/archive.asc
+    target__file_put "$ARCHIVE_PUB" keys/archive.asc
     return
   fi
-  for f in "$ROOT"/keys/*.asc; do target__put "$f" "keys/${f##*/}"; done
-  for f in $(target__ls keys); do
-    [[ -e $ROOT/keys/$f ]] || target__rm "keys/$f"
+  for f in "$ROOT"/keys/*.asc; do target__file_put "$f" "keys/${f##*/}"; done
+  for f in $(target__file_list keys); do
+    [[ -e $ROOT/keys/$f ]] || target__file_delete "keys/$f"
   done
 }

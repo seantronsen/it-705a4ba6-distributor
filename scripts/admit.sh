@@ -56,7 +56,7 @@ finish() {
 check_publisher() {
   local out=$1 repo=$2 tag=$3 pubs actors reasons=()
   pubs=$(config__get .publishers)
-  actors=$(github__tag_push_actors "$repo" "$tag")
+  actors=$(github__tag_push_actor_list "$repo" "$tag")
   [[ $(jq length <<< "$actors") -gt 0 ]] \
     || finish "$out" rejected "no push run found for tag $tag, so its publisher can't be checked"
   # Usernames are labels only; flag a listed ID whose username has since changed.
@@ -75,14 +75,14 @@ check_publisher() {
 ################################################################################
 fetch_sidecars() {
   local out=$1 repo=$2 tag=$3 f id missing=()
-  github__release_assets "$repo" "$tag" > "$out/assets.json"
+  github__release_asset_list "$repo" "$tag" > "$out/assets.json"
   for f in "${SIDECARS[@]}"; do
     jq -e --arg n "$f" 'any(.name == $n)' "$out/assets.json" > /dev/null || missing+=("missing $f")
   done
   [[ ${#missing[@]} -eq 0 ]] || finish "$out" rejected "${missing[@]}"
   for f in "${SIDECARS[@]}"; do
     id=$(jq -r --arg n "$f" '.[] | select(.name == $n) | .id' "$out/assets.json")
-    github__fetch_asset "$repo" "$id" "$out/release/$f"
+    github__release_asset_download "$repo" "$id" "$out/release/$f"
   done
 }
 
@@ -155,7 +155,7 @@ fetch_packages() {
       reasons+=("$name is listed in checksums.txt but not attached")
       continue
     fi
-    github__fetch_asset "$repo" "$id" "$out/files/$name"
+    github__release_asset_download "$repo" "$id" "$out/files/$name"
     got=$(sha256sum "$out/files/$name" | cut -d' ' -f1)
     [[ $got == "$want" ]] || reasons+=("$name: sha256 $got doesn't match checksums.txt")
   done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<< "$checksums")
@@ -173,9 +173,9 @@ fetch_packages() {
 read_packages() {
   local out=$1 checksums=$2 name sha info arch infos='[]'
   while IFS=$'\t' read -r name sha; do
-    info=$(package__info "$out/files/$name") || log__fatal "can't read package metadata: $name"
+    info=$(package__metadata "$out/files/$name") || log__fatal "can't read package metadata: $name"
     arch=$(jq -r .arch <<< "$info")
-    if ! package__is_supported_arch "$(jq -r .format <<< "$info")" "$arch"; then
+    if ! package__is_arch_supported "$(jq -r .format <<< "$info")" "$arch"; then
       log__info "admit: ignoring $name (architecture $arch)"
       rm -f "$out/files/$name"
       continue
@@ -222,7 +222,8 @@ version_reasons() {
 apply_package_rules() {
   state__json | base__jq -c --arg repo "$1" --argjson cfg "$(config__get .repos)" \
     --argjson infos "$2" \
-    'import "admit" as admit; . as $state | $infos | admit::check($state; $cfg; $repo)'
+    'import "admit" as admit;
+      . as $state | $infos | admit::package_rules_apply($state; $cfg; $repo)'
 }
 
 ################################################################################
@@ -251,9 +252,10 @@ main() {
   local repo=$1 tag=$2 out checksums infos
   mkdir -p "$3/release" "$3/files"
   out=$(cd "$3" && pwd)
-  jq -n --arg key "$repo@$tag" --arg repo "$repo" --arg tag "$tag" --arg at "$(base__now)" \
-    --arg run "$(github__run_url)" '{key: $key, repo: $repo, tag: $tag, status: "pending",
-      at: $at, run: $run, reasons: [], packages: []}' > "$out/result.json"
+  jq -n --arg key "$repo@$tag" --arg repo "$repo" --arg tag "$tag" \
+    --arg at "$(base__timestamp_utc)" --arg run "$(github__run_url)" '{key: $key, repo: $repo,
+      tag: $tag, status: "pending", at: $at, run: $run, reasons: [], packages: []}' \
+    > "$out/result.json"
   fetch_sidecars "$out" "$repo" "$tag"
   check_publisher "$out" "$repo" "$tag"
   verify_chain "$out" "$repo"

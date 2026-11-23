@@ -18,7 +18,7 @@ BATCH=50
 ################################################################################
 # The published rpms not signed with the current archive key.
 # Globals:
-#   ARCHIVE_FPR (keys__init_archive)
+#   ARCHIVE_FPR (keys__archive_load)
 # Outputs:
 #   [{release, filename}] as JSON on stdout.
 ################################################################################
@@ -38,15 +38,15 @@ resign_batch() {
   mkdir -p "$dir/new/packages"
   jq -r '.[].filename' <<< "$1" > "$dir/excludes"
   while IFS= read -r f; do
-    target__get "rpm/packages/$f" "$dir/new/packages/$f" \
+    target__file_get "rpm/packages/$f" "$dir/new/packages/$f" \
       || log__fatal "rpm/packages/$f is in state but not on the target"
-    keys__resign_rpm "$dir/new/packages/$f"
+    keys__rpm_resign "$dir/new/packages/$f"
   done < "$dir/excludes"
-  meta=$(repo__rpm_metadata "$dir/meta" "$dir/new" "$dir/excludes")
+  meta=$(repo__rpm_metadata_build "$dir/meta" "$dir/new" "$dir/excludes")
   while IFS= read -r f; do
-    target__put "$dir/new/packages/$f" "rpm/packages/$f"
+    target__file_put "$dir/new/packages/$f" "rpm/packages/$f"
   done < "$dir/excludes"
-  repo__write_rpm_metadata "$meta"
+  repo__rpm_metadata_write "$meta"
 }
 
 ################################################################################
@@ -68,9 +68,9 @@ rekey_rpm() {
     log__info "rekey rpm: $((i + $(jq length <<< "$batch")))/$total re-signed"
   done
   # Nothing to re-sign: still re-sign repomd.xml, which no batch rewrote.
-  if [[ $total -eq 0 ]] && target__get rpm/repodata/repomd.xml "$work/repomd.xml"; then
+  if [[ $total -eq 0 ]] && target__file_get rpm/repodata/repomd.xml "$work/repomd.xml"; then
     gpg --batch --armor --detach-sign -o "$work/repomd.xml.asc" "$work/repomd.xml"
-    target__put "$work/repomd.xml.asc" rpm/repodata/repomd.xml.asc
+    target__file_put "$work/repomd.xml.asc" rpm/repodata/repomd.xml.asc
   fi
 }
 
@@ -81,10 +81,10 @@ rekey_rpm() {
 ################################################################################
 rekey_deb() {
   local work=$1
-  target__get "deb/dists/$SUITE/Release" "$work/dist/Release" || return 0
-  repo__sign_apt "$work/dist"
-  target__put "$work/dist/Release.gpg" "deb/dists/$SUITE/Release.gpg"
-  target__put "$work/dist/InRelease" "deb/dists/$SUITE/InRelease"
+  target__file_get "deb/dists/$SUITE/Release" "$work/dist/Release" || return 0
+  repo__apt_release_sign "$work/dist"
+  target__file_put "$work/dist/Release.gpg" "deb/dists/$SUITE/Release.gpg"
+  target__file_put "$work/dist/InRelease" "deb/dists/$SUITE/InRelease"
 }
 
 ################################################################################
@@ -97,10 +97,10 @@ main() {
   mkdir -p "$2"
   delta=$(cd "$2" && pwd)/rekey-$fmt.json
   jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
-  keys__init_archive
+  keys__archive_load
   work=$(mktemp -d)
   if [[ $fmt == rpm ]]; then rekey_rpm "$delta" "$work"; else rekey_deb "$work"; fi
-  keys__publish
+  keys__public_publish
   log__info "rekey $fmt: done ($(target__url))"
 }
 

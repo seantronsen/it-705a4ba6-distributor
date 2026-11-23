@@ -44,12 +44,12 @@ file_issues() {
   local f group key
   for f in "$@"; do
     jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
-    github__ensure_issue "Rejected release: $(jq -r .key "$f")" rejected-release \
+    github__issue_ensure "Rejected release: $(jq -r .key "$f")" rejected-release \
       "$(base__jq -r 'import "record" as record; record::rejection_body' "$f")"
   done
   while IFS= read -r group; do
     key=$(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group")
-    github__create_issue "Denied repo key: $key ($(date -u +%F))" denied-repo-key \
+    github__issue_create "Denied repo key: $key ($(date -u +%F))" denied-repo-key \
       "$(base__jq -r 'import "record" as record; record::denial_body' <<< "$group")"
   done < <(base__jq -c -s 'import "record" as record; record::denial_groups' "$@")
 }

@@ -15,7 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 # Outputs:
 #   {format, name, version, arch, filename} as JSON on stdout.
 ################################################################################
-package__info() {
+package__metadata() {
   local f=$1 name version arch format
   case $f in
     *.rpm)
@@ -45,7 +45,7 @@ package__info() {
 # Returns:
 #   0 when it does, 1 otherwise.
 ################################################################################
-package__is_supported_arch() {
+package__is_arch_supported() {
   config__get ".architectures.$1" | jq -e --arg a "$2" 'any(. == $a)' > /dev/null
 }
 
@@ -56,7 +56,7 @@ package__is_supported_arch() {
 # Outputs:
 #   The path on stdout.
 ################################################################################
-package__path() {
+package__target_path() {
   case $1 in
     rpm) echo "rpm/packages/$3" ;;
     deb) echo "deb/pool/main/${2:0:1}/$2/$3" ;;

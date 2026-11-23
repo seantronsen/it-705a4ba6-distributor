@@ -8,7 +8,7 @@ def claims($n; $s): $n == $s or ($n | startswith($s + "-"));
 # The release's packages (input: [{format, name, version, arch, filename, ...}]) with the name,
 # duplicate, and already-admitted rules applied: each gets `reasons` ([] when it passes).
 # $state: state/state.json; $cfg: the repos, keyed by name; $repo: the release's repo.
-def check($state; $cfg; $repo):
+def package_rules_apply($state; $cfg; $repo):
   short($repo) as $me
   | $cfg[$repo].allow as $allow
   | [$cfg | to_entries[] | select(.key != $repo) | {name: .key} + .value] as $others
