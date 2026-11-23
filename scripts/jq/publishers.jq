@@ -5,9 +5,8 @@
 # registered by someone else, an ID can't. No entry: no. An entry without `repos` (core
 # maintainers): any repo. With `repos`: only those.
 def may_publish($pubs; $id; $repo):
-  ($repo | ascii_downcase) as $r
-  | $pubs["\($id)"] as $p
-  | $p != null and ($p.repos == null or any($p.repos[]; ascii_downcase == $r));
+  $pubs["\($id)"] as $p
+  | $p != null and ($p.repos == null or any($p.repos[]; . == $repo));
 
 # A reason per actor who may not publish $repo, naming their roles and runs.
 def rejections($pubs; $repo):

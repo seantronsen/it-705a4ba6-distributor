@@ -86,9 +86,10 @@ archive-key:
 #
 #   username: GitHub username (required). A label for readers; admit logs a
 #             warning when it no longer matches the ID.
-#   repos: the repos this publisher may publish (optional; case doesn't
-#          matter). Leave it out for core maintainers, who may publish every
-#          repo. Set it for project leads trusted with their own projects only.
+#   repos: the repos this publisher may publish (optional; spelled exactly
+#          as under `repos` below). Leave it out for core maintainers, who may
+#          publish every repo. Set it for project leads trusted with their own
+#          projects only.
 #          Never empty. A repo that isn't under `repos` below is never polled,
 #          so listing one does nothing.
 #
