@@ -89,23 +89,30 @@ verify_chain() {
   set_result '.repo_key = $f' --arg f "${fpr^^}"
 }
 
-check_packages() {
-  local repo_key reasons=() denied
+# Rejects the release when its repo key is denied (config `deny`).
+check_denied_key() {
+  local repo_key denied
   repo_key=$(jq -r .repo_key "$result")
   denied=$(jq -r --arg repo "$repo" --arg f "$repo_key" \
     '(.[$repo].deny // [])[] | select(.fingerprint == $f) | .reason // "no reason given"' \
     <<< "$cfg" | head -1)
   [[ -z $denied ]] || finish rejected "repo key $repo_key is denied: $denied"
+}
 
-  # Packages listed in checksums.txt ("<sha256>  <name>", or "<sha256> *<name>").
-  local -A want=()
+# Reads the packages checksums.txt lists ("<sha256>  <name>", or "<sha256> *<name>") into want:
+# name -> sha256.
+read_checksums() {
   local hash name
   while read -r hash name; do
     name=${name#\*}
     [[ $name == *.rpm || $name == *.deb ]] && want[$name]=$hash
   done < "$out/release/checksums.txt"
+}
 
-  local id got
+# Downloads each listed package; rejects the release when one isn't attached or its sha256
+# doesn't match.
+fetch_packages() {
+  local name id got reasons=()
   for name in "${!want[@]}"; do
     # GitHub renames "~" to "." in asset names.
     id=$(jq -r --arg a "$name" --arg b "${name//\~/.}" \
@@ -119,8 +126,13 @@ check_packages() {
     [[ $got == "${want[$name]}" ]] || reasons+=("$name: sha256 $got doesn't match checksums.txt")
   done
   [[ ${#reasons[@]} -eq 0 ]] || finish rejected "${reasons[@]}"
+}
 
-  local info infos='[]'
+# Reads each package's metadata into infos (a JSON array, with its sha256), dropping packages of
+# architectures the distributor doesn't publish.
+read_packages() {
+  local name info
+  infos='[]'
   for name in "${!want[@]}"; do
     info=$(package_info "$out/files/$name") || die "can't read package metadata: $name"
     if ! supported_arch "$(jq -r .format <<< "$info")" "$(jq -r .arch <<< "$info")"; then
@@ -128,21 +140,30 @@ check_packages() {
       rm -f "$out/files/$name"
       continue
     fi
-    infos=$(jq -c --argjson i "$info" --arg sha "${want[$name]}" '. + [$i + {sha256: $sha}]' <<< "$infos")
+    infos=$(jq -c --argjson i "$info" --arg sha "${want[$name]}" '. + [$i + {sha256: $sha}]' \
+      <<< "$infos")
   done
+}
 
-  # Prerelease versions: skip the release quietly. Other non major.minor.patch versions: reject.
+# Skips the release quietly when any package has a prerelease version.
+check_prerelease() {
   if jq -e 'any(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+[~-]"))' <<< "$infos" > /dev/null; then
     rm -rf "$out/files"
     finish skipped "prerelease version"
   fi
-  mapfile -t reasons < <(jq -r '.[] | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$") | not)
-    | "\(.filename): version \(.version) isn'"'"'t major.minor.patch"' <<< "$infos")
+}
 
-  # Name, duplicate, and already-admitted rules.
-  # State goes to jq on stdin: it outgrows the command-line argument limit.
-  local checked
-  checked=$(state_json | jql -c --arg repo "$repo" --argjson cfg "$cfg" --argjson infos "$infos" '
+# Version reasons, one per line: other versions than major.minor.patch.
+version_reasons() {
+  jq -r '.[] | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$") | not)
+    | "\(.filename): version \(.version) isn'"'"'t major.minor.patch"' <<< "$infos"
+}
+
+# The packages with the name, duplicate, and already-admitted rules applied, as JSON: each with
+# its reasons ([] when it passes). State goes to jq on stdin: it outgrows the command-line
+# argument limit.
+apply_package_rules() {
+  state_json | jql -c --arg repo "$repo" --argjson cfg "$cfg" --argjson infos "$infos" '
     include "lib";
     def short($r): $r | split("/") | last | ascii_downcase;
     def claims($n; $s): $n == $s or ($n | startswith($s + "-"));
@@ -178,16 +199,30 @@ check_packages() {
              else empty end)
           ] as $why
         | $p + {reasons: ($why | unique)})
-  ')
+  '
+}
+
+# Rejects the release on any version or package rule; else admits its packages.
+check_packages() {
+  local reasons checked
+  mapfile -t reasons < <(version_reasons)
+  checked=$(apply_package_rules)
   mapfile -t -O "${#reasons[@]}" reasons < <(jq -r '.[].reasons[]' <<< "$checked")
   [[ ${#reasons[@]} -eq 0 ]] || finish rejected "${reasons[@]}"
-
-  set_result '.packages = [$c[] | del(.reasons) + {path: "files/\(.filename)", status: "published"}]' \
-    --argjson c "$checked"
+  set_result '.packages = [$c[] | del(.reasons)
+    + {path: "files/\(.filename)", status: "published"}]' --argjson c "$checked"
   finish published
 }
+
+declare -A want=()
+infos='[]'
 
 fetch_sidecars
 check_publisher
 verify_chain
+check_denied_key
+read_checksums
+fetch_packages
+read_packages
+check_prerelease
 check_packages
