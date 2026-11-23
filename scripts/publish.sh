@@ -6,6 +6,9 @@
 # Takes the admitted packages of that format from each admit dir's result.json, signs the rpms,
 # writes the packages to the publish target, then merges them into the repository metadata.
 # Writes <outdir>/delta-<format>.json for record.
+#
+# Environment: ARCHIVE_GPG_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (required);
+#   ARCHIVE_GPG_PASSPHRASE (optional).
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/keys.sh"
 source "$(dirname "$0")/lib/package.sh"
@@ -86,6 +89,7 @@ write_publish_delta() {
 ################################################################################
 main() {
   local fmt=$1 out delta new work meta
+  base__env_require ARCHIVE_GPG_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
   mkdir -p "$2"
   out=$(cd "$2" && pwd)
   delta=$out/delta-$fmt.json

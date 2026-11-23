@@ -7,6 +7,9 @@
 # Packages every public key in keys/ (the archive public key without keys/archive.asc) with
 # nfpm, at the latest keyring version in state with the patch bumped (1.0.0 first). Writes
 # <outdir>/result.json and <outdir>/files/.
+#
+# Environment: ARCHIVE_GPG_KEY, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID (required);
+#   ARCHIVE_GPG_PASSPHRASE (optional).
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/keys.sh"
@@ -82,6 +85,7 @@ build_keyring_packages() {
 ################################################################################
 main() {
   local out version
+  base__env_require ARCHIVE_GPG_KEY GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID
   mkdir -p "$1/files"
   out=$(cd "$1" && pwd)
   keys__archive_load

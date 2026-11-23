@@ -8,6 +8,8 @@
 # fetched state so concurrent writers never overwrite each other.
 # issues: opens an issue per rejected release and per denied repo key, unless one is already
 # open. CI runs state inside the commit retry loop and issues once after it.
+#
+# Environment: GITHUB_TOKEN, GITHUB_REPOSITORY (required for issues).
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/state.sh"
@@ -104,7 +106,10 @@ main() {
   local mode=$1
   shift
   if [[ $mode == state || $mode == all ]]; then apply_deltas_to_state "$@"; fi
-  if [[ $mode == issues || $mode == all ]]; then open_issues "$@"; fi
+  if [[ $mode == issues || $mode == all ]]; then
+    base__env_require GITHUB_TOKEN GITHUB_REPOSITORY
+    open_issues "$@"
+  fi
 }
 
 [[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."

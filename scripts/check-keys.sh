@@ -7,6 +7,10 @@
 # config's archive_key.warn_days, and keeps the "Archive key expiring" and "Archive key switch
 # due" issues open or closed to match. Fails without ARCHIVE_GPG_KEY, so a poll never runs
 # without the key.
+#
+# Environment: GITHUB_TOKEN, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID, ARCHIVE_GPG_KEY
+#  (required); ARCHIVE_GPG_PASSPHRASE (optional).
+source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/keys.sh"
@@ -83,6 +87,7 @@ carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, s
 ################################################################################
 main() {
   local warn_days
+  base__env_require GITHUB_TOKEN GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID ARCHIVE_GPG_KEY
   warn_days=$(config__get .archive_key.warn_days)
   keys__archive_load
   update_switch_due_issue "$warn_days"

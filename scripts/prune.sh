@@ -8,6 +8,9 @@
 # doesn't list as published (left by a run that died mid-publish, or a state reset). Rewrites
 # the repository metadata without them and deletes their files. Writes
 # <outdir>/prune-<format>.json for record.
+#
+# Environment: ARCHIVE_GPG_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (required);
+#   ARCHIVE_GPG_PASSPHRASE (optional).
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/keys.sh"
@@ -111,6 +114,7 @@ delete_package_files() {
 main() {
   local fmt=$1 out denied pruned remove work meta
   local -a orphans
+  base__env_require ARCHIVE_GPG_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
   mkdir -p "$2"
   out=$(cd "$2" && pwd)
   denied=$(published_packages_with_denied_key "$fmt")

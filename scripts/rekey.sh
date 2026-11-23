@@ -7,6 +7,9 @@
 # then its metadata; writes <outdir>/rekey-rpm.json after each batch, so record keeps the
 # progress after a failure or timeout and a rerun resumes from state. deb: re-signs Release (debs
 # carry no signature). Both republish keys/.
+#
+# Environment: ARCHIVE_GPG_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (required);
+#   ARCHIVE_GPG_PASSPHRASE (optional).
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/keys.sh"
 source "$(dirname "$0")/lib/metadata.sh"
@@ -94,6 +97,7 @@ resign_apt_release() {
 ################################################################################
 main() {
   local fmt=$1 delta work
+  base__env_require ARCHIVE_GPG_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
   mkdir -p "$2"
   delta=$(cd "$2" && pwd)/rekey-$fmt.json
   jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"

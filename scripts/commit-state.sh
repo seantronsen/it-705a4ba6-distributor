@@ -6,6 +6,10 @@
 #   commit-state.sh [result.json|delta.json]...
 #
 # CI only: needs a checkout that can push, and the runner's GITHUB_* variables.
+#
+# Environment: GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_REF_NAME,
+#   GITHUB_WORKFLOW.
+source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/github.sh"
 
 ################################################################################
@@ -16,6 +20,8 @@ source "$(dirname "$0")/lib/github.sh"
 ################################################################################
 main() {
   local attempt
+  base__env_require GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID GITHUB_REF_NAME \
+    GITHUB_WORKFLOW
   if [[ $# -eq 0 ]]; then
     log__info 'Nothing to record.'
     return

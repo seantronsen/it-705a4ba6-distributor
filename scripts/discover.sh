@@ -2,6 +2,8 @@
 # Discover: list releases not yet in state.
 # Prints a JSON matrix of {repo, tag}: the oldest new releases first, at most the config's
 # max_releases; the rest wait for the next polls.
+#
+# Environment: GITHUB_TOKEN.
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/github.sh"
@@ -15,6 +17,7 @@ source "$(dirname "$0")/lib/state.sh"
 ################################################################################
 main() {
   local max new repo releases
+  base__env_require GITHUB_TOKEN
   max=$(config__get .max_releases)
   new=$(mktemp)
   while IFS= read -r repo; do

@@ -10,6 +10,9 @@
 # Writes <outdir>/result.json with status published, skipped, or rejected (plus reasons), and the
 # admitted packages under <outdir>/files/. Exits non-zero only for infrastructure errors (API,
 # downloads), which leave nothing to record so the next poll retries the release.
+#
+# Environment: GITHUB_TOKEN, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID,
+#   MASTER_PUBLIC_ASC, MASTER_FPR.
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/github.sh"
@@ -100,8 +103,7 @@ download_sidecars() {
 verify_trust_chain() {
   local out=$1 repo=$2 fpr
   curl -fsSL --retry 3 "$VERIFY_CHAIN_URL" -o "$out/verify-chain.sh"
-  MASTER_PUBLIC_KEY=${MASTER_PUBLIC_ASC:?MASTER_PUBLIC_ASC is required} \
-    MASTER_FINGERPRINT=${MASTER_FPR:?MASTER_FPR is required} \
+  MASTER_PUBLIC_KEY=$MASTER_PUBLIC_ASC MASTER_FINGERPRINT=$MASTER_FPR \
     REPO_KEY_FILE=$out/release/pubkey-repo.asc SIGNING_KEY_FILE=$out/release/pubkey-signing.asc \
     FILES=$out/release/checksums.txt REPO=$repo OUTPUT_FILE=$out/verify.out \
     bash "$out/verify-chain.sh" >&2 \
@@ -257,6 +259,8 @@ admit_or_reject_packages() {
 ################################################################################
 main() {
   local repo=$1 tag=$2 out checksums infos
+  base__env_require GITHUB_TOKEN GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID \
+    MASTER_PUBLIC_ASC MASTER_FPR
   mkdir -p "$3/release" "$3/files"
   out=$(cd "$3" && pwd)
   jq -n --arg key "$repo@$tag" --arg repo "$repo" --arg tag "$tag" \

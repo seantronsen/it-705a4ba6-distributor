@@ -2,12 +2,7 @@
 # The base every distributor script and lib/ module sources: strict mode, logging, paths, and
 # constants. Source it; don't run it.
 #
-# Environment (all optional unless a script says otherwise):
-#   GITHUB_TOKEN           gh's token for the GitHub API (releases, assets, runs, issues)
-#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   credentials for the config's `target.s3`
-#   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (required to sign)
-#   ARCHIVE_GPG_PASSPHRASE its passphrase, if any
-#   MASTER_PUBLIC_ASC, MASTER_FPR   root public key and fingerprint (admit)
+# Each script lists the environment it needs in its header and checks it with base__env_require.
 
 [[ -n ${_LIB_BASE_SH:-} ]] && return 0
 _LIB_BASE_SH=1
@@ -53,4 +48,17 @@ base__jq() { jq -L "$ROOT/scripts/jq" "$@"; }
 ################################################################################
 base__uri_encode() {
   jq -rn --arg s "$1" '$s | @uri'
+}
+
+################################################################################
+# Exits when any of the named environment variables is unset or empty, naming every missing one.
+# Arguments:
+#   <variable name>...
+################################################################################
+base__env_require() {
+  local name missing=()
+  for name in "$@"; do
+    [[ -n ${!name:-} ]] || missing+=("$name")
+  done
+  ((${#missing[@]} == 0)) || log__fatal "missing environment: ${missing[*]}"
 }

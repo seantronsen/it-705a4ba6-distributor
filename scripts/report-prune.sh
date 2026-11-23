@@ -7,6 +7,10 @@
 #
 # Exits 1 when prune failed twice in a row, so the run shows it. CI only: needs the runner's
 # GITHUB_* variables, and GITHUB_TOKEN.
+#
+# Environment: GITHUB_TOKEN, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID,
+#   GITHUB_WORKFLOW_REF.
+source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/github.sh"
 
 TITLE='Prune failing'
@@ -38,6 +42,8 @@ has_prune_failed_before() {
 ################################################################################
 main() {
   local failed=$1
+  base__env_require GITHUB_TOKEN GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID \
+    GITHUB_WORKFLOW_REF
   if [[ $failed == false ]]; then
     github__issue_close "$TITLE" "$LABEL" \
       "Prune succeeded again ([run]($(github__current_run_url)))."
