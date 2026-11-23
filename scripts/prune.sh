@@ -17,7 +17,7 @@ fmt=$1 out=$2
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
 
-cfg=$(config_json)
+cfg=$(config_get .repos)
 state=$(state_json)
 
 # This format's published packages admitted with a denied repo key, as JSON:
@@ -116,4 +116,4 @@ excludes "$remove" "${orphans[@]}" > "$excludes_file"
 rewrite_metadata "$excludes_file"
 delete_files "$remove" "${orphans[@]}"
 
-log "prune $fmt: done ($TARGET)"
+log "prune $fmt: done ($(target_url))"

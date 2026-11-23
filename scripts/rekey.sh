@@ -69,4 +69,4 @@ archive_key_init
 work=$(mktemp -d)
 if [[ $fmt == rpm ]]; then rekey_rpm "$delta"; else rekey_deb; fi
 keys_write
-log "rekey $fmt: done ($TARGET)"
+log "rekey $fmt: done ($(target_url))"

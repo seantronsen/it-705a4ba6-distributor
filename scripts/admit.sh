@@ -35,7 +35,7 @@ finish() { # <status> [reason...]
   exit 0
 }
 
-cfg=$(config_json)
+cfg=$(config_get .repos)
 
 # Rejects the release unless everyone who pushed its tag or ran its push runs may publish this
 # repo (config `publishers`). Backstop for a repo missing its `v*` tag ruleset.
@@ -45,7 +45,7 @@ cfg=$(config_json)
 # draft guard, so the latest run is the publisher's but the release isn't. No run: rejected.
 check_publisher() {
   local pubs actors reasons=()
-  pubs=$(publishers_json)
+  pubs=$(config_get .publishers)
   actors=$(tag_push_actors "$repo" "$tag")
   [[ $(jq length <<< "$actors") -gt 0 ]] \
     || finish rejected "no push run found for tag $tag, so its publisher can't be checked"

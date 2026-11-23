@@ -38,11 +38,19 @@ run_url() { echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN
 # jq with scripts/lib.jq available through `include "lib";`.
 jql() { jq -L "$ROOT/scripts" "$@"; }
 
-# The config's repos, keyed by repo name, as JSON.
-config_json() { yq -o=json -I=0 '.repos // {}' "$CONFIG"; }
+# Whether a config setting is set.
+config_has() { # <jq path>
+  yq -o=json -I=0 . "$CONFIG" | jq -e "$1 != null" > /dev/null
+}
 
-# The config's publishers, keyed by GitHub user ID, as JSON.
-publishers_json() { yq -o=json -I=0 '.publishers // {}' "$CONFIG"; }
+# One config setting: scalars raw, objects and arrays as JSON. Dies when it isn't set: the
+# schema says what's required, so the scripts carry no defaults.
+config_get() { # <jq path>, e.g. .repos or .target.s3.bucket
+  yq -o=json -I=0 . "$CONFIG" \
+    | jq -r "$1"' | if . == null then error("unset") elif type == "object" or type == "array"
+        then tojson else . end' 2> /dev/null \
+    || die "config: $1 isn't set"
+}
 
 state_json() {
   if [[ -s $STATE ]]; then cat "$STATE"; else echo '{}'; fi
@@ -124,34 +132,37 @@ issue_create() { # <title> <label> <body>
 # --- Publish target ---------------------------------------------------------------------------
 
 # The target is the config's `target.s3` bucket, or else the local directory PUBLISH_DIR.
-# Exports the settings, since publish runs target_put in child processes.
+# Checks it's usable before anything is written.
 target_init() {
-  local s3
-  s3=$(yq -o=json -I=0 '.target.s3 // {}' "$CONFIG")
-  TARGET_S3_BUCKET=$(jq -r '.bucket // empty' <<< "$s3")
-  TARGET_S3_REGION=$(jq -r '.region // empty' <<< "$s3")
-  TARGET_S3_ENDPOINT=$(jq -r '.endpoint // empty' <<< "$s3")
-  TARGET_S3_METADATA_MAX_AGE=$(jq -r '.["metadata-max-age"] // empty' <<< "$s3")
-  export TARGET_S3_BUCKET TARGET_S3_REGION TARGET_S3_ENDPOINT TARGET_S3_METADATA_MAX_AGE
-  if [[ -n $TARGET_S3_BUCKET ]]; then
+  if target_is_s3; then
     # A throwaway key on a real target would publish packages nobody can verify.
     [[ -n ${ARCHIVE_GPG_KEY:-} ]] || die "target.s3 is set, so ARCHIVE_GPG_KEY is required"
-    TARGET=s3://$TARGET_S3_BUCKET
   else
     mkdir -p "${PUBLISH_DIR:?PUBLISH_DIR is required without target.s3}"
-    TARGET=$PUBLISH_DIR
   fi
-  export TARGET
 }
 
-s3() { aws --region "$TARGET_S3_REGION" ${TARGET_S3_ENDPOINT:+--endpoint-url "$TARGET_S3_ENDPOINT"} "$@"; }
+target_is_s3() { config_has .target.s3; }
+
+# The target's location, for logs and the aws CLI: s3://<bucket> or the PUBLISH_DIR path.
+target_url() {
+  if target_is_s3; then echo "s3://$(config_get .target.s3.bucket)"; else echo "$PUBLISH_DIR"; fi
+}
+
+s3() {
+  local endpoint=()
+  if config_has .target.s3.endpoint; then
+    endpoint=(--endpoint-url "$(config_get .target.s3.endpoint)")
+  fi
+  aws --region "$(config_get .target.s3.region)" "${endpoint[@]}" "$@"
+}
 
 # Packages never change; metadata and keys do, so caches (a CDN) refetch them after
 # target.s3.metadata-max-age seconds.
 cache_control() { # <path>
   case $1 in
     rpm/packages/* | deb/pool/*) echo 'public,max-age=31536000,immutable' ;;
-    *) echo "public,max-age=$TARGET_S3_METADATA_MAX_AGE,must-revalidate" ;;
+    *) echo "public,max-age=$(config_get '.target.s3["metadata-max-age"]'),must-revalidate" ;;
   esac
 }
 
@@ -160,18 +171,19 @@ cache_control() { # <path>
 target_get() { # <path> <dest>
   local err
   mkdir -p "$(dirname "$2")"
-  if [[ -z $TARGET_S3_BUCKET ]]; then
+  if ! target_is_s3; then
     [[ -f $PUBLISH_DIR/$1 ]] || return 1
     cp "$PUBLISH_DIR/$1" "$2"
-  elif ! err=$(s3 s3api get-object --bucket "$TARGET_S3_BUCKET" --key "$1" "$2" 2>&1 > /dev/null); then
+  elif ! err=$(s3 s3api get-object --bucket "$(config_get .target.s3.bucket)" --key "$1" "$2" \
+    2>&1 > /dev/null); then
     [[ $err == *NoSuchKey* ]] && return 1
-    die "can't read $TARGET/$1: $err"
+    die "can't read $(target_url)/$1: $err"
   fi
 }
 
 target_put() { # <src> <path>; atomic per file
-  if [[ -n $TARGET_S3_BUCKET ]]; then
-    s3 s3 cp --only-show-errors --cache-control "$(cache_control "$2")" "$1" "$TARGET/$2"
+  if target_is_s3; then
+    s3 s3 cp --only-show-errors --cache-control "$(cache_control "$2")" "$1" "$(target_url)/$2"
     return
   fi
   local dest=$PUBLISH_DIR/$2
@@ -181,16 +193,17 @@ target_put() { # <src> <path>; atomic per file
 }
 
 target_rm() { # <path>
-  if [[ -n $TARGET_S3_BUCKET ]]; then
-    s3 s3 rm --only-show-errors "$TARGET/$1"
+  if target_is_s3; then
+    s3 s3 rm --only-show-errors "$(target_url)/$1"
   else
     rm -f "$PUBLISH_DIR/$1"
   fi
 }
 
 target_ls() { # <dir>: file names directly in it
-  if [[ -n $TARGET_S3_BUCKET ]]; then
-    s3 s3api list-objects-v2 --bucket "$TARGET_S3_BUCKET" --prefix "$1/" --delimiter / --output json \
+  if target_is_s3; then
+    s3 s3api list-objects-v2 --bucket "$(config_get .target.s3.bucket)" --prefix "$1/" \
+      --delimiter / --output json \
       | jq -r --arg p "$1/" '(.Contents // [])[].Key | ltrimstr($p)'
     return
   fi
@@ -199,8 +212,9 @@ target_ls() { # <dir>: file names directly in it
 }
 
 target_find() { # <dir>: paths of every file under it, from the target root
-  if [[ -n $TARGET_S3_BUCKET ]]; then
-    s3 s3api list-objects-v2 --bucket "$TARGET_S3_BUCKET" --prefix "$1/" --output json \
+  if target_is_s3; then
+    s3 s3api list-objects-v2 --bucket "$(config_get .target.s3.bucket)" --prefix "$1/" \
+      --output json \
       | jq -r '(.Contents // [])[].Key'
     return
   fi

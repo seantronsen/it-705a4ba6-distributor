@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 
 MAX_RELEASES=256
 
-cfg=$(config_json)
+cfg=$(config_get .repos)
 
 # State goes to jq on stdin: it outgrows the command-line argument limit.
 new=$(mktemp)
