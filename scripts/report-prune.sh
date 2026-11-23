@@ -19,7 +19,7 @@ LABEL=prune-failing
 # Returns:
 #   0 when one did, 1 otherwise.
 ################################################################################
-has_failed_before() {
+has_prune_failed_before() {
   local workflow previous failed
   # The calling workflow's file (e.g. poll.yml), from owner/repo/<path>@<ref>.
   workflow=${GITHUB_WORKFLOW_REF%@*}
@@ -47,7 +47,7 @@ main() {
       "Prune succeeded again ([run]($(github__current_run_url)))."
     return
   fi
-  if ! has_failed_before; then
+  if ! has_prune_failed_before; then
     echo "::warning::Prune failed; the next run retries it."
     return
   fi

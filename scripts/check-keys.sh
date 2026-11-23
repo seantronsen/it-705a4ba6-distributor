@@ -33,7 +33,7 @@ days_to_expiry() {
 # Returns:
 #   1 within the warning days of expiry, so the run fails.
 ################################################################################
-check_expiry() {
+fail_if_archive_key_expiring() {
   local warn_days=$1 days
   days=$(days_to_expiry)
   if [[ -n $days && $days -lt $warn_days ]]; then
@@ -52,7 +52,7 @@ key management). Run: $(github__current_run_url)"
 # Outputs:
 #   The days on stdout, or nothing if it isn't there.
 ################################################################################
-days_since_next_key() {
+days_since_next_key_committed() {
   local added
   [[ -f $ROOT/keys/archive-next.asc ]] || return 0
   added=$(git -C "$ROOT" log --diff-filter=A --format=%ct -- keys/archive-next.asc | tail -1)
@@ -65,9 +65,9 @@ days_since_next_key() {
 # Arguments:
 #   <grace period, days>
 ################################################################################
-check_switch_due() {
+update_switch_due_issue() {
   local warn_days=$1 days
-  days=$(days_since_next_key)
+  days=$(days_since_next_key_committed)
   if [[ -z $days ]]; then
     github__issue_close "$SWITCH_DUE" archive-key \
       "keys/archive-next.asc is gone: the switch is done."
@@ -85,8 +85,8 @@ main() {
   local warn_days
   warn_days=$(config__get .archive_key.warn_days)
   keys__archive_load
-  check_switch_due "$warn_days"
-  check_expiry "$warn_days"
+  update_switch_due_issue "$warn_days"
+  fail_if_archive_key_expiring "$warn_days"
   log__info "check-keys: archive key $ARCHIVE_FPR OK"
 }
 

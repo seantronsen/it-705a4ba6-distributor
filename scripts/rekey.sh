@@ -22,7 +22,7 @@ BATCH=50
 # Outputs:
 #   [{release, filename}] as JSON on stdout.
 ################################################################################
-rpms_to_resign() {
+rpms_not_signed_with_archive_key() {
   state__json | base__jq -c --arg fpr "$ARCHIVE_FPR" 'import "state" as state;
     state::published_packages
     | map(select(.format == "rpm" and .signed_with != $fpr) | {release, filename})'
@@ -33,7 +33,7 @@ rpms_to_resign() {
 # Arguments:
 #   <batch json> <work dir>
 ################################################################################
-resign_batch() {
+resign_rpm_batch() {
   local dir=$2 f meta
   mkdir -p "$dir/new/packages"
   jq -r '.[].filename' <<< "$1" > "$dir/excludes"
@@ -55,14 +55,14 @@ resign_batch() {
 # Arguments:
 #   <delta file> <work dir>
 ################################################################################
-rekey_rpm() {
+resign_rpms() {
   local delta=$1 work=$2 todo total i batch
-  todo=$(rpms_to_resign)
+  todo=$(rpms_not_signed_with_archive_key)
   total=$(jq length <<< "$todo")
   log__info "rekey rpm: $total package(s) to re-sign with $ARCHIVE_FPR"
   for ((i = 0; i < total; i += BATCH)); do
     batch=$(jq -c --argjson i "$i" --argjson n "$BATCH" '.[$i:$i + $n]' <<< "$todo")
-    resign_batch "$batch" "$work/batch-$i"
+    resign_rpm_batch "$batch" "$work/batch-$i"
     jq --argjson b "$batch" --arg fpr "$ARCHIVE_FPR" '.patches += [$b[] + {signed_with: $fpr}]' \
       "$delta" > "$delta.tmp" && mv "$delta.tmp" "$delta"
     log__info "rekey rpm: $((i + $(jq length <<< "$batch")))/$total re-signed"
@@ -79,7 +79,7 @@ rekey_rpm() {
 # Arguments:
 #   <work dir>
 ################################################################################
-rekey_deb() {
+resign_apt_release() {
   local work=$1
   target__file_get "deb/dists/$SUITE/Release" "$work/dist/Release" || return 0
   metadata__apt_release_sign "$work/dist"
@@ -99,7 +99,7 @@ main() {
   jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
   keys__archive_load
   work=$(mktemp -d)
-  if [[ $fmt == rpm ]]; then rekey_rpm "$delta" "$work"; else rekey_deb "$work"; fi
+  if [[ $fmt == rpm ]]; then resign_rpms "$delta" "$work"; else resign_apt_release "$work"; fi
   keys__publish
   log__info "rekey $fmt: done ($(target__url))"
 }

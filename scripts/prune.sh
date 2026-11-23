@@ -23,7 +23,7 @@ source "$(dirname "$0")/lib/target.sh"
 # Outputs:
 #   [{release, repo, format, name, filename, fingerprint}] as JSON on stdout.
 ################################################################################
-denied_packages() {
+published_packages_with_denied_key() {
   state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
     'import "state" as state;
       state::published_packages_with_denied_key($cfg) | map(select(.format == $fmt))'
@@ -32,11 +32,11 @@ denied_packages() {
 ################################################################################
 # A format's other published packages that retention drops.
 # Arguments:
-#   <rpm|deb> <denied (denied_packages)>
+#   <rpm|deb> <denied (published_packages_with_denied_key)>
 # Outputs:
 #   The packages as JSON on stdout.
 ################################################################################
-retention_packages() {
+packages_pruned_by_retention() {
   state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
     --argjson denied "$2" '
     import "state" as state; import "retention" as retention;
@@ -48,9 +48,10 @@ retention_packages() {
 ################################################################################
 # Writes the delta for record: a pruned patch per package, and the denied ones for their issues.
 # Arguments:
-#   <rpm|deb> <outdir> <pruned (retention_packages)> <denied (denied_packages)>
+#   <rpm|deb> <outdir> <pruned (packages_pruned_by_retention)>
+#   <denied (published_packages_with_denied_key)>
 ################################################################################
-write_delta() {
+write_prune_delta() {
   jq -n --arg fmt "$1" --argjson pruned "$3" --argjson denied "$4" '
     {format: $fmt,
      patches: ([$pruned[] | {release, filename, status: "pruned", reason: "retention"}]
@@ -66,7 +67,7 @@ write_delta() {
 # Outputs:
 #   Their paths on stdout, one per line.
 ################################################################################
-orphan_paths() {
+orphan_package_paths() {
   local fmt=$1 pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
   comm -23 <(target__file_list_tree "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
@@ -82,7 +83,7 @@ orphan_paths() {
 # Outputs:
 #   The files on stdout, one per line.
 ################################################################################
-excludes() {
+metadata_excludes() {
   local fmt=$1 remove=$2 name filename f
   shift 2
   while IFS=$'\t' read -r name filename; do
@@ -120,7 +121,7 @@ rewrite_metadata() {
 # Arguments:
 #   <rpm|deb> <remove (JSON)> [orphan path]...
 ################################################################################
-delete_files() {
+delete_package_files() {
   local fmt=$1 remove=$2 name filename f
   shift 2
   while IFS=$'\t' read -r name filename; do
@@ -140,12 +141,12 @@ main() {
   local -a orphans
   mkdir -p "$2"
   out=$(cd "$2" && pwd)
-  denied=$(denied_packages "$fmt")
-  pruned=$(retention_packages "$fmt" "$denied")
-  write_delta "$fmt" "$out" "$pruned" "$denied"
+  denied=$(published_packages_with_denied_key "$fmt")
+  pruned=$(packages_pruned_by_retention "$fmt" "$denied")
+  write_prune_delta "$fmt" "$out" "$pruned" "$denied"
   remove=$(jq -c -s 'add' <<< "$pruned $denied")
 
-  mapfile -t orphans < <(orphan_paths "$fmt")
+  mapfile -t orphans < <(orphan_package_paths "$fmt")
   if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
     log__info "prune $fmt: nothing to remove"
     return
@@ -155,9 +156,9 @@ main() {
 
   keys__archive_load
   excludes_file=$(mktemp)
-  excludes "$fmt" "$remove" "${orphans[@]}" > "$excludes_file"
+  metadata_excludes "$fmt" "$remove" "${orphans[@]}" > "$excludes_file"
   rewrite_metadata "$fmt" "$excludes_file"
-  delete_files "$fmt" "$remove" "${orphans[@]}"
+  delete_package_files "$fmt" "$remove" "${orphans[@]}"
   log__info "prune $fmt: done ($(target__url))"
 }
 

@@ -20,7 +20,7 @@ KEYRING=openchami-keyring
 # Outputs:
 #   The version on stdout.
 ################################################################################
-next_version() {
+next_keyring_version() {
   state__json | base__jq -r --arg n "$KEYRING@" 'import "version" as version;
     [keys[] | select(startswith($n)) | ltrimstr($n) | version::parse_semver]
     | (max // [1, 0, -1]) | "\(.[0]).\(.[1]).\(.[2] + 1)"'
@@ -34,7 +34,7 @@ next_version() {
 # Arguments:
 #   <dest>
 ################################################################################
-export_keys() {
+export_public_keys() {
   local dest=$1 home keys=("$ROOT"/keys/*.asc) k
   [[ -f $ROOT/keys/archive.asc ]] || keys=("$ARCHIVE_PUB")
   home=$(mktemp -d)
@@ -49,7 +49,7 @@ export_keys() {
 # Arguments:
 #   <version> <files dir> <dest>
 ################################################################################
-write_result() {
+write_admit_result() {
   local version=$1 files=$2 dest=$3 f pkgs='[]'
   for f in "$files"/*; do
     pkgs=$(jq -c --argjson i "$(package__metadata "$f")" \
@@ -63,23 +63,33 @@ write_result() {
 }
 
 ################################################################################
+# Builds the keyring rpm and deb with nfpm.
+# Arguments:
+#   <version> <files dir>
+################################################################################
+build_keyring_packages() {
+  local version=$1 files=$2 fmt
+  for fmt in rpm deb; do
+    (cd "$ROOT" && KEYRING_VERSION=$version nfpm package -f keyring/nfpm.yaml -p "$fmt" \
+      -t "$files/" > /dev/null) || log__fatal "nfpm failed to build the $fmt keyring"
+  done
+}
+
+################################################################################
 # Builds the keyring at its next version into the admit dir.
 # Arguments:
 #   <outdir>
 ################################################################################
 main() {
-  local out version fmt
+  local out version
   mkdir -p "$1/files"
   out=$(cd "$1" && pwd)
   keys__archive_load
-  version=$(next_version)
+  version=$(next_keyring_version)
   mkdir -p "$ROOT/keyring/build"
-  export_keys "$ROOT/keyring/build/keys.asc"
-  for fmt in rpm deb; do
-    (cd "$ROOT" && KEYRING_VERSION=$version nfpm package -f keyring/nfpm.yaml -p "$fmt" \
-      -t "$out/files/" > /dev/null) || log__fatal "nfpm failed to build the $fmt keyring"
-  done
-  write_result "$version" "$out/files" "$out/result.json"
+  export_public_keys "$ROOT/keyring/build/keys.asc"
+  build_keyring_packages "$version" "$out/files"
+  write_admit_result "$version" "$out/files" "$out/result.json"
   log__info "keyring: built $KEYRING@$version"
 }
 

@@ -18,7 +18,7 @@ source "$(dirname "$0")/lib/state.sh"
 # Arguments:
 #   <result.json|delta.json>...
 ################################################################################
-update_state() {
+apply_deltas_to_state() {
   local state f releases=() patches=()
   state=$(state__json)
   for f in "$@"; do
@@ -80,7 +80,7 @@ EOF
 # Arguments:
 #   <result.json|delta.json>...
 ################################################################################
-file_issues() {
+open_issues() {
   local f group key
   for f in "$@"; do
     jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
@@ -103,8 +103,8 @@ file_issues() {
 main() {
   local mode=$1
   shift
-  if [[ $mode == state || $mode == all ]]; then update_state "$@"; fi
-  if [[ $mode == issues || $mode == all ]]; then file_issues "$@"; fi
+  if [[ $mode == state || $mode == all ]]; then apply_deltas_to_state "$@"; fi
+  if [[ $mode == issues || $mode == all ]]; then open_issues "$@"; fi
 }
 
 [[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
