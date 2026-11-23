@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "an expiring archive key fails polls until it's replaced" {
   local distributor run
   distributor=$(settings__get .repos.distributor.remote)

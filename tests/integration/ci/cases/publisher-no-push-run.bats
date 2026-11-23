@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a release without a push run is rejected" {
   local role=fixture repo
   repo=$(settings__get ".repos.$role.remote")

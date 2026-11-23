@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "an invalid config fails the poll and touches nothing" {
   local role=fixture repo distributor run before
   repo=$(settings__get ".repos.$role.remote")

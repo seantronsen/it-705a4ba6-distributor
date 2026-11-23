@@ -7,6 +7,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a failing prune keeps an issue open until it recovers" {
   local role=fixture repo distributor fpr run before
   repo=$(settings__get ".repos.$role.remote")

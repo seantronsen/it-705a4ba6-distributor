@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a denied repo key is pruned and its new releases rejected" {
   local role=fixture repo name fpr
   repo=$(settings__get ".repos.$role.remote")

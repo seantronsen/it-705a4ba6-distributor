@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a release with an uncertified signature is rejected" {
   local role=fixture repo reason
   repo=$(settings__get ".repos.$role.remote")

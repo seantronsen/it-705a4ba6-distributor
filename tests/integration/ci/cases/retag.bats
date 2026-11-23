@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a retagged copy of an admitted release is rejected" {
   local role=fixture repo
   repo=$(settings__get ".repos.$role.remote")

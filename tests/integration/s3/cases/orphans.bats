@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "orphaned package files are deleted from the bucket" {
   local role=fixture repo keys key
   repo=$(settings__get ".repos.$role.remote")

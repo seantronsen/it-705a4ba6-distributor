@@ -170,39 +170,44 @@ lifecycle__reset() {
 }
 
 ################################################################################
-# Checks the state the last test left against its schema, then puts the distributor back on
-# the seed commit when a test moved it, and waits until no poll runs.
+# Checks the state a test left against its schema, once no poll runs. Every case that resets
+# the repos calls it from its teardown.
 # Returns:
-#   0, or 1 when the state was invalid, the push failed, or a poll didn't finish.
+#   0 when it's valid, 1 when it isn't or a poll didn't finish.
+################################################################################
+lifecycle__check_state() {
+  github__wait_idle "$(settings__get .repos.distributor.remote)" && state__is_valid
+}
+
+################################################################################
+# Puts the distributor back on the seed commit when a test moved it, and waits until no poll
+# runs.
+# Returns:
+#   0, or 1 when the push failed or a poll didn't finish.
 ################################################################################
 lifecycle__reset_distributor() {
-  local dir repo valid=true
+  local dir repo
   dir="$(settings__get .run.share_dir)/seed-distributor"
   repo=$(settings__get .repos.distributor.remote)
   github__wait_idle "$repo" || return 1
-  state__is_valid || valid=false
   if [[ $(github__head_sha "$repo") != "$(git -C "$dir" rev-parse HEAD)" ]]; then
     log__info "reset: $repo back to the seed commit"
     git__push_main "$dir" "$repo" --force || return 1
     # A config difference triggers a poll.
     github__wait_idle "$repo" || return 1
   fi
-  $valid
 }
 
 ################################################################################
-# Checks the state the last test left against its schema (lifecycle__reset checks the others),
-# then cleans the repos: everything wiped (runs too) and the secrets deleted. The cleaning is
-# skipped when keep is set, to inspect what the run left.
+# Cleans the repos after a run: everything wiped (runs too) and the secrets deleted. Skipped
+# when keep is set, to inspect what the run left.
 # Returns:
-#   0, or 1 when the state was invalid or cleaning failed.
+#   0, or 1 when cleaning failed.
 ################################################################################
 lifecycle__teardown_suite() {
   local repo failed=false
-  github__wait_idle "$(settings__get .repos.distributor.remote)" && state__is_valid || failed=true
   if suite__is_kept; then
     log__info "keep is set: leaving the repos as the run left them"
-    $failed && return 1
     return 0
   fi
   lifecycle__guard || return 1

@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 ################################################################################
 # Whether a release ended with a status and, if given, a reason containing some text.
 # Arguments:

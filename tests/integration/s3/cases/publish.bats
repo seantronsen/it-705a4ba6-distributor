@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a release is published to the bucket with its cache headers" {
   local role=fixture repo fpr key meta tmp
   repo=$(settings__get ".repos.$role.remote")

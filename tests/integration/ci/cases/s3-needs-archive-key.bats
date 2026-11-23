@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "target.s3 without an archive key fails the poll" {
   local role=fixture repo distributor run
   repo=$(settings__get ".repos.$role.remote")

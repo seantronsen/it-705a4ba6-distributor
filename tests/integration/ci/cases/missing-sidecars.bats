@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a release missing its sidecars is rejected once" {
   local repo at
   repo=$(settings__get .repos.fixture.remote)

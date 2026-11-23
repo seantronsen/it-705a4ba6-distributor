@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a publisher limited to the service repo can't publish the fixture" {
   local role=fixture repo service_repo name id
   repo=$(settings__get ".repos.$role.remote")

@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a prerelease is ignored" {
   local role=fixture repo
   repo=$(settings__get ".repos.$role.remote")

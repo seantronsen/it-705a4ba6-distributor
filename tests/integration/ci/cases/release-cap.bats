@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a poll processes at most MAX_RELEASES releases" {
   local distributor repo dir tag
   distributor=$(settings__get .repos.distributor.remote)

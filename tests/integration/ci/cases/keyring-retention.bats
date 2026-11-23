@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a second keyring build bumps the patch and prunes the first" {
   workflow__run keyring.yml > /dev/null
   workflow__run keyring.yml > /dev/null

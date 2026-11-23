@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 ################################################################################
 # Whether one of the distributor's recent commits was made by a run (its message ends with the
 # run's URL).

@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a denied key's packages are deleted from the bucket" {
   local role=fixture repo keys key
   repo=$(settings__get ".repos.$role.remote")

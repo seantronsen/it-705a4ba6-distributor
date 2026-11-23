@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a release pushed by a non-publisher is rejected" {
   local role=fixture repo name
   repo=$(settings__get ".repos.$role.remote")

@@ -25,6 +25,10 @@ setup() {
   source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 # Where the bootstrap key and apt's CA files go: under artifacts/, the same path on the host,
 # where the engine mounts from.
 install_dir() { echo "$(settings__get .run.artifacts_dir)/s3-install"; }

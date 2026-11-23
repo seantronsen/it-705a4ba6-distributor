@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 ################################################################################
 # Cancels a poll run once admit or publish is running.
 # Arguments:

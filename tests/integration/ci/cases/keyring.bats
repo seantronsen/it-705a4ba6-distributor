@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "the keyring workflow publishes openchami-keyring" {
   local run fpr dir
   fpr=$(keys__fpr archive)

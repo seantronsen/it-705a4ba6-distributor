@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a new release is admitted and its packages published" {
   local role=fixture repo name
   repo=$(settings__get ".repos.$role.remote")

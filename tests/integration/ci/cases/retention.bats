@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a new patch release prunes the previous patch" {
   local role=fixture repo name
   repo=$(settings__get ".repos.$role.remote")

@@ -9,7 +9,11 @@ setup() {
 # Reverting keys/ (the reset's force push) triggers the keyring workflow, which commits state
 # after the reset; a second reset undoes that, so the next test starts clean.
 teardown() {
+  local valid=true
+  # Before the reset, which puts the seed state back.
+  lifecycle__check_state || valid=false
   lifecycle__reset_distributor && lifecycle__reset_distributor
+  $valid
 }
 
 @test "an archive key that isn't keys/archive.asc fails the poll" {

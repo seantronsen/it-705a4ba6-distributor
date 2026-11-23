@@ -7,6 +7,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a real release is admitted and its repositories published" {
   local repo run dir
   repo=$(settings__get .repos.service.remote)

@@ -6,6 +6,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 # Whether a release's rpms are all recorded as signed with a key.
 rpms_signed_with() {
   state__has --arg k "$1" --arg f "$2" \

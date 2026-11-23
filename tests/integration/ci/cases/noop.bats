@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a poll with nothing new changes nothing" {
   local role=fixture repo distributor before run
   repo=$(settings__get ".repos.$role.remote")

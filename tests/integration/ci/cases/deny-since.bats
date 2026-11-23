@@ -5,6 +5,10 @@ setup() {
   lifecycle__reset
 }
 
+teardown() {
+  lifecycle__check_state
+}
+
 @test "a repo key denied since a date is pruned from that date only" {
   local role=fixture repo name fpr since
   repo=$(settings__get ".repos.$role.remote")
