@@ -1,4 +1,4 @@
-# One poll admits at most max-releases releases (lowered to 3 here); the rest wait for the next.
+# One poll admits at most max_releases releases (lowered to 3 here); the rest wait for the next.
 
 setup() {
   source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
@@ -9,11 +9,11 @@ teardown() {
   lifecycle__check_state
 }
 
-@test "a poll processes at most max-releases releases" {
+@test "a poll processes at most max_releases releases" {
   local repo tag
   repo=$(settings__get .repos.fixture.remote)
   # The next test's reset restores the seed config.
-  distributor__config_default | sed 's/^max-releases: 256$/max-releases: 3/' \
+  distributor__config_default | sed 's/^max_releases: 256$/max_releases: 3/' \
     | distributor__config_push > /dev/null
   # Empty releases, a couple of seconds apart so discover orders them reliably.
   for tag in v1.0.1 v1.0.2 v1.0.3 v1.0.4; do

@@ -42,10 +42,10 @@ state__is_valid() {
     rm -f "$file"
     return 1
   fi
-  /src/distributor/scripts/validate.sh /src/distributor/state/state.schema.json "$file"
+  /src/distributor/scripts/validate.sh /src/distributor/schemas/state.schema.json "$file"
   status=$?
   rm -f "$file"
-  ((status == 0)) || log__error "state.json on main doesn't match state/state.schema.json"
+  ((status == 0)) || log__error "state.json on main doesn't match schemas/state.schema.json"
   return "$status"
 }
 

@@ -1,5 +1,5 @@
 # A release is published to the bucket: packages cached as immutable, metadata and keys for
-# metadata-max-age, the repository metadata signed by the archive key.
+# metadata_max_age, the repository metadata signed by the archive key.
 
 setup() {
   source "$BATS_TEST_DIRNAME/../../lib/harness.sh"

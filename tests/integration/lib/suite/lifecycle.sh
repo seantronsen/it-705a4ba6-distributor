@@ -128,7 +128,7 @@ lifecycle__seed_distributor() {
     log__error "can't clone /src/distributor"
     return 1
   fi
-  distributor__config_default > "$dir/config/repos.yaml"
+  distributor__config_default > "$dir/config/distributor.yaml"
   echo '{}' > "$dir/state/state.json"
   # Tests dispatch every poll.
   sed -i '/^  schedule:$/,/^    - cron:/d' "$poll"
