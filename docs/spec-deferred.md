@@ -131,11 +131,6 @@ Parked on `seantronsen/wip/tests`.
 - The branch still relies on the old phased admit, the vendored `verify-chain.sh`, and the
   local-run tooling (`run-local.sh`, `in-tools.sh`); rework it against the new admit, which
   fetches the trust-chain script.
-- TODO (design for testability, with the repo revision): move the inline jq blobs out of the
-  scripts into named defs, so each script reads top-down and each def tests as a pure function
-  on fixture JSON. Split `lib.jq` by domain (`version`, `config`, `state`, `publishers`, `deny`,
-  `retention`), use `import "x" as x;`, keep a per-script module only for logic nothing else
-  uses, and promote a def once a second caller needs it. Consider the same split for `lib.sh`.
 
 ### Integration suite
 
@@ -266,7 +261,7 @@ Remaining (the check itself is spec.md, Admit step 2):
   `crafted__release` wait for the tag's push run before polling. Then cases for an allowed
   publisher, one not listed, and a lead limited to another repo. Batched with the other test
   work.
-- Make `validate-config` a required status check on `main` (repo setting).
+- Make `validate` a required status check on `main` (repo setting).
 
 ## Presentation
 
@@ -282,14 +277,7 @@ the publisher check above). Then the testing-guide's presentation run as the dem
 - TODO, consider: drop the local directory target once S3 is proven, which simplifies every
   `target_*` function. Blocked until the suite has an internet-reachable test bucket: its CI and
   distro tests read the local target's artifacts.
-- TODO: read config in `scripts/` the way the integration suite does (`config__get` /
-  `settings__get`): one getter for every setting that needn't be an environment variable, no
-  defaults in code, a missing key is an error. Replaces the ad hoc `yq`/`jq` reads and the
-  exported `TARGET_S3_*` variables. A bigger edit; do it once the features are in.
 - TODO: trim the doc comments in `scripts/` (many are too verbose), during the cleanup.
-- TODO: use the `gh` CLI for every GitHub API call in `scripts/lib.sh` (curl wrapper, page loops,
-  asset downloads, issue helpers; about 30 lines). Paginate with `--paginate` plus per-page
-  `--jq` and `jq -s`, not `--slurp` (gh 2.48+; older gh, e.g. Debian's, lacks it).
 - TODO: build the suite's crafted packages (`ci/lib/crafted.sh`) with nfpm, as real releases do
   through GoReleaser (about 30 lines; pinned nfpm binary in the tools container).
 - apk and pacman. Both can update their indexes without old packages (tested): pacman natively
@@ -305,17 +293,6 @@ the publisher check above). Then the testing-guide's presentation run as the dem
   releases of smd, bss, magellan, ochami, opaal, tokensmith, and release carry unsigned packages
   with no sidecars; the first polls reject each one (256 per poll, oldest first) and open an
   issue per release, until state covers them all. That's intended.
-- TODO: key `repos` in `config/repos.yaml` by repo name, like `publishers` (duplicates become a
-  parse error; `by_name` and the `select(.name == $repo)` lookups go away). Same pass: drop the
-  `tostring` and `ascii_upcase` the schema makes redundant (require uppercase fingerprints), and
-  allow uppercase in `allow` names (rpm permits them).
-- TODO: run `validate-config.yml` on `ubuntu-latest`, like every poll job.
-- TODO: refactor `scripts/prune.sh`: the decisions, the orphan reconcile, the metadata rewrite,
-  and the deletes are all inline; split them into small functions.
-- TODO: refactor `scripts/admit.sh`. It's the hardest script to read: long inline jq programs
-  (the name, ownership, and duplicate rules), mixed shell and jq state, and checks of very
-  different sizes in one file. Move the jq into `lib.jq` (or its own `.jq` file) and split the
-  checks into small functions of similar shape.
 - `releases_list` gets more expensive as releases accumulate (every poll lists every release);
   see Order, item 10.
 
