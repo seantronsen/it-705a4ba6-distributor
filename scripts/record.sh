@@ -25,13 +25,53 @@ update_state() {
     if jq -e .key "$f" > /dev/null; then releases+=("$f"); else patches+=("$f"); fi
   done
   for f in "${releases[@]}" "${patches[@]}"; do
-    state=$(base__jq -c --slurpfile d "$f" 'import "record" as record; record::apply($d[0])' \
-      <<< "$state")
+    state=$(base__jq -c --slurpfile d "$f" \
+      'import "state" as state; state::apply_delta($d[0])' <<< "$state")
   done
 
   jq -S . <<< "$state" > "$STATE.tmp"
   mv "$STATE.tmp" "$STATE"
   log__info "record: updated $STATE"
+}
+
+################################################################################
+# The body of a rejected release's issue.
+# Arguments:
+#   <result.json>
+# Outputs:
+#   The body on stdout.
+################################################################################
+rejection_issue_body() {
+  local result=$1 key reasons run
+  key=$(jq -r .key "$result")
+  reasons=$(jq -r '.reasons | map("- \(.)") | join("\n")' "$result")
+  run=$(jq -r .run "$result")
+  cat << EOF
+Release \`$key\` was rejected, so none of its packages were published.
+
+$reasons
+
+Run: $run
+
+Fix the problem and publish a new patch release; this release won't be processed again.
+EOF
+}
+
+################################################################################
+# The body of a denied repo key's issue.
+# Arguments:
+#   <denied packages of one repo and key, as JSON>
+# Outputs:
+#   The body on stdout.
+################################################################################
+denial_issue_body() {
+  local packages
+  packages=$(jq -r 'map("- `\(.filename)` (\(.release))") | join("\n")' <<< "$1")
+  cat << EOF
+These packages were admitted with a denied repo key and have been unpublished:
+
+$packages
+EOF
 }
 
 ################################################################################
@@ -44,14 +84,15 @@ file_issues() {
   local f group key
   for f in "$@"; do
     jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
-    github__issue_ensure "Rejected release: $(jq -r .key "$f")" rejected-release \
-      "$(base__jq -r 'import "record" as record; record::rejection_body' "$f")"
+    github__issue_ensure_open "Rejected release: $(jq -r .key "$f")" rejected-release \
+      "$(rejection_issue_body "$f")"
   done
   while IFS= read -r group; do
     key=$(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group")
     github__issue_create "Denied repo key: $key ($(date -u +%F))" denied-repo-key \
-      "$(base__jq -r 'import "record" as record; record::denial_body' <<< "$group")"
-  done < <(base__jq -c -s 'import "record" as record; record::denial_groups' "$@")
+      "$(denial_issue_body "$group")"
+  # The denied packages across the delta files, one group per repo and key.
+  done < <(jq -c -s '[.[].denied // [] | .[]] | group_by([.repo, .fingerprint])[]' "$@")
 }
 
 ################################################################################

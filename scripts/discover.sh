@@ -19,8 +19,11 @@ main() {
   new=$(mktemp)
   while IFS= read -r repo; do
     releases=$(github__release_list "$repo")
-    state__json | base__jq -c --arg repo "$repo" --argjson rel "$releases" \
-      'import "discover" as discover; discover::new($repo; $rel)' >> "$new"
+    # Published, non-prerelease releases that state has no entry for.
+    state__json | jq -c --arg repo "$repo" --argjson rel "$releases" '. as $state
+      | $rel[] | select((.draft or .prerelease) | not)
+      | {repo: $repo, tag: .tag_name, published_at}
+      | select($state["\(.repo)@\(.tag)"] == null)' >> "$new"
   done < <(config__get .repos | jq -r 'keys[]')
   log__info "discover: $(wc -l < "$new") new release(s), admitting at most $max"
   jq -s -c --argjson max "$max" 'sort_by(.published_at) | .[:$max] | map({repo, tag})' "$new"

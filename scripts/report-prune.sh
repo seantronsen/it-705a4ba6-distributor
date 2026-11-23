@@ -43,15 +43,16 @@ has_failed_before() {
 main() {
   local failed=$1
   if [[ $failed == false ]]; then
-    github__issue_close "$TITLE" "$LABEL" "Prune succeeded again ([run]($(github__run_url)))."
+    github__issue_close "$TITLE" "$LABEL" \
+      "Prune succeeded again ([run]($(github__current_run_url)))."
     return
   fi
   if ! has_failed_before; then
     echo "::warning::Prune failed; the next run retries it."
     return
   fi
-  github__issue_ensure "$TITLE" "$LABEL" \
-    "Prune failed in two runs in a row. Latest: $(github__run_url)"
+  github__issue_ensure_open "$TITLE" "$LABEL" \
+    "Prune failed in two runs in a row. Latest: $(github__current_run_url)"
   return 1
 }
 

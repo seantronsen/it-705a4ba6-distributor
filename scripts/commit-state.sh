@@ -33,7 +33,7 @@ main() {
       log__info 'State unchanged.'
       return
     fi
-    git commit --quiet -m "state: $GITHUB_WORKFLOW $(github__run_url)"
+    git commit --quiet -m "state: $GITHUB_WORKFLOW $(github__current_run_url)"
     git push --quiet origin "HEAD:$GITHUB_REF_NAME" && return
     log__info "Push failed (attempt $attempt); retrying on the latest state."
   done

@@ -38,9 +38,9 @@ check_expiry() {
   days=$(days_to_expiry)
   if [[ -n $days && $days -lt $warn_days ]]; then
     log__info "check-keys: archive key $ARCHIVE_FPR expires in $days day(s)"
-    github__issue_ensure "$EXPIRING" archive-key \
+    github__issue_ensure_open "$EXPIRING" archive-key \
       "Archive key \`$ARCHIVE_FPR\` expires in $days day(s). Rotate it (spec-deferred.md, Archive \
-key management). Run: $(github__run_url)"
+key management). Run: $(github__current_run_url)"
     return 1
   fi
   github__issue_close "$EXPIRING" archive-key \
@@ -72,7 +72,7 @@ check_switch_due() {
     github__issue_close "$SWITCH_DUE" archive-key \
       "keys/archive-next.asc is gone: the switch is done."
   elif [[ $days -ge $warn_days ]]; then
-    github__issue_ensure "$SWITCH_DUE" archive-key \
+    github__issue_ensure_open "$SWITCH_DUE" archive-key \
       "\`keys/archive-next.asc\` was committed $days days ago, so clients have had the keyring \
 carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, step 3)."
   fi

@@ -23,7 +23,7 @@ SIDECARS=(checksums.txt checksums.txt.asc pubkey-signing.asc pubkey-repo.asc)
 # Arguments:
 #   <outdir> <jq filter> [jq args...]
 ################################################################################
-set_result() {
+update_result() {
   local result=$1/result.json filter=$2
   shift 2
   jq "$@" "$filter" "$result" > "$result.tmp" && mv "$result.tmp" "$result"
@@ -34,10 +34,10 @@ set_result() {
 # Arguments:
 #   <outdir> <published|skipped|rejected> [reason...]
 ################################################################################
-finish() {
+finish_admission() {
   local out=$1 status=$2
   shift 2
-  set_result "$out" '.status = $st | .reasons += $r' --arg st "$status" \
+  update_result "$out" '.status = $st | .reasons += $r' --arg st "$status" \
     --argjson r "$(jq -nc '$ARGS.positional' --args "$@")"
   log__info "admit $(jq -r .key "$out/result.json"): $status${*:+ ($*)}"
   exit 0
@@ -53,18 +53,21 @@ finish() {
 # Arguments:
 #   <outdir> <owner/repo> <tag>
 ################################################################################
-check_publisher() {
+reject_if_publisher_not_allowed() {
   local out=$1 repo=$2 tag=$3 pubs actors reasons=()
   pubs=$(config__get .publishers)
   actors=$(github__tag_push_actor_list "$repo" "$tag")
   [[ $(jq length <<< "$actors") -gt 0 ]] \
-    || finish "$out" rejected "no push run found for tag $tag, so its publisher can't be checked"
+    || finish_admission "$out" rejected \
+      "no push run found for tag $tag, so its publisher can't be checked"
   # Usernames are labels only; flag a listed ID whose username has since changed.
-  base__jq -r --argjson p "$pubs" 'import "publishers" as publishers; publishers::renamed($p)' \
-    <<< "$actors" | while read -r line; do log__info "$line"; done
+  base__jq -r --argjson p "$pubs" \
+    'import "publishers" as publishers; publishers::rename_warnings($p)' <<< "$actors" \
+    | while read -r line; do log__info "$line"; done
   mapfile -t reasons < <(base__jq -r --argjson p "$pubs" --arg repo "$repo" \
-    'import "publishers" as publishers; publishers::rejections($p; $repo)' <<< "$actors")
-  [[ ${#reasons[@]} -eq 0 ]] || finish "$out" rejected "${reasons[@]}"
+    'import "publishers" as publishers; publishers::unauthorized_actor_reasons($p; $repo)' \
+    <<< "$actors")
+  [[ ${#reasons[@]} -eq 0 ]] || finish_admission "$out" rejected "${reasons[@]}"
 }
 
 ################################################################################
@@ -73,13 +76,13 @@ check_publisher() {
 # Arguments:
 #   <outdir> <owner/repo> <tag>
 ################################################################################
-fetch_sidecars() {
+download_sidecars() {
   local out=$1 repo=$2 tag=$3 f id missing=()
   github__release_asset_list "$repo" "$tag" > "$out/assets.json"
   for f in "${SIDECARS[@]}"; do
     jq -e --arg n "$f" 'any(.name == $n)' "$out/assets.json" > /dev/null || missing+=("missing $f")
   done
-  [[ ${#missing[@]} -eq 0 ]] || finish "$out" rejected "${missing[@]}"
+  [[ ${#missing[@]} -eq 0 ]] || finish_admission "$out" rejected "${missing[@]}"
   for f in "${SIDECARS[@]}"; do
     id=$(jq -r --arg n "$f" '.[] | select(.name == $n) | .id' "$out/assets.json")
     github__release_asset_download "$repo" "$id" "$out/release/$f"
@@ -94,7 +97,7 @@ fetch_sidecars() {
 # Arguments:
 #   <outdir> <owner/repo>
 ################################################################################
-verify_chain() {
+verify_trust_chain() {
   local out=$1 repo=$2 fpr
   curl -fsSL --retry 3 "$VERIFY_CHAIN_URL" -o "$out/verify-chain.sh"
   MASTER_PUBLIC_KEY=${MASTER_PUBLIC_ASC:?MASTER_PUBLIC_ASC is required} \
@@ -102,23 +105,27 @@ verify_chain() {
     REPO_KEY_FILE=$out/release/pubkey-repo.asc SIGNING_KEY_FILE=$out/release/pubkey-signing.asc \
     FILES=$out/release/checksums.txt REPO=$repo OUTPUT_FILE=$out/verify.out \
     bash "$out/verify-chain.sh" >&2 \
-    || finish "$out" rejected \
+    || finish_admission "$out" rejected \
       "trust chain or checksums.txt signature didn't verify (see the run log)"
   fpr=$(sed -n 's/^fingerprint-repo=//p' "$out/verify.out")
-  set_result "$out" '.repo_key = $f' --arg f "${fpr^^}"
+  update_result "$out" '.repo_key = $f' --arg f "${fpr^^}"
 }
 
 ################################################################################
-# Rejects the release when its repo key is denied (config `deny`).
+# Rejects the release when the repo key that signed it is on its repo's deny list (config
+# `deny`), with the entry's reason.
 # Arguments:
 #   <outdir> <owner/repo>
 ################################################################################
-check_denied_key() {
-  local out=$1 repo=$2 repo_key denied
+reject_if_repo_key_denied() {
+  local out=$1 repo=$2 repo_key entry
   repo_key=$(jq -r .repo_key "$out/result.json")
-  denied=$(config__get .repos | base__jq -r --arg repo "$repo" --arg f "$repo_key" \
-    'import "deny" as deny; deny::reason($repo; $f)')
-  [[ -z $denied ]] || finish "$out" rejected "repo key $repo_key is denied: $denied"
+  entry=$(config__get .repos | jq -c --arg repo "$repo" --arg f "$repo_key" \
+    'first(.[$repo].deny[] | select(.fingerprint == $f))')
+  if [[ -n $entry ]]; then
+    finish_admission "$out" rejected \
+      "repo key $repo_key is denied: $(jq -r '.reason // "no reason given"' <<< "$entry")"
+  fi
 }
 
 ################################################################################
@@ -145,7 +152,7 @@ read_checksums() {
 # Arguments:
 #   <outdir> <owner/repo> <checksums (read_checksums)>
 ################################################################################
-fetch_packages() {
+download_packages() {
   local out=$1 repo=$2 checksums=$3 name want id got reasons=()
   while IFS=$'\t' read -r name want; do
     # GitHub renames "~" to "." in asset names.
@@ -159,7 +166,7 @@ fetch_packages() {
     got=$(sha256sum "$out/files/$name" | cut -d' ' -f1)
     [[ $got == "$want" ]] || reasons+=("$name: sha256 $got doesn't match checksums.txt")
   done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<< "$checksums")
-  [[ ${#reasons[@]} -eq 0 ]] || finish "$out" rejected "${reasons[@]}"
+  [[ ${#reasons[@]} -eq 0 ]] || finish_admission "$out" rejected "${reasons[@]}"
 }
 
 ################################################################################
@@ -170,7 +177,7 @@ fetch_packages() {
 # Outputs:
 #   The packages as a JSON array on stdout.
 ################################################################################
-read_packages() {
+read_package_metadata() {
   local out=$1 checksums=$2 name sha info arch infos='[]'
   while IFS=$'\t' read -r name sha; do
     info=$(package__metadata "$out/files/$name") || log__fatal "can't read package metadata: $name"
@@ -188,63 +195,63 @@ read_packages() {
 ################################################################################
 # Skips the release quietly when any package has a prerelease version.
 # Arguments:
-#   <outdir> <packages (read_packages)>
+#   <outdir> <packages (read_package_metadata)>
 ################################################################################
-check_prerelease() {
+skip_if_prerelease() {
   local out=$1 infos=$2
   if base__jq -e 'import "version" as version; any(.version | version::is_prerelease)' \
     <<< "$infos" > /dev/null; then
     rm -rf "$out/files"
-    finish "$out" skipped "prerelease version"
+    finish_admission "$out" skipped "prerelease version"
   fi
 }
 
 ################################################################################
 # The packages whose version isn't major.minor.patch.
 # Arguments:
-#   <packages (read_packages)>
+#   <packages (read_package_metadata)>
 # Outputs:
 #   A reason per package on stdout.
 ################################################################################
-version_reasons() {
-  base__jq -r 'import "version" as version; .[] | select(.version | version::is_release | not)
+version_rejection_reasons() {
+  base__jq -r 'import "version" as version; .[] | select(.version | version::is_semver | not)
     | "\(.filename): version \(.version) isn'"'"'t major.minor.patch"' <<< "$1"
 }
 
 ################################################################################
-# The packages with the name, duplicate, and already-admitted rules applied. State goes to jq
-# on stdin: it outgrows the command-line argument limit.
+# Each package's rejection reasons under the name, duplicate, and already-admitted rules. State
+# goes to jq on stdin: it outgrows the command-line argument limit.
 # Arguments:
-#   <owner/repo> <packages (read_packages)>
+#   <owner/repo> <packages (read_package_metadata)>
 # Outputs:
 #   The packages as JSON on stdout, each with its reasons ([] when it passes).
 ################################################################################
-apply_package_rules() {
+package_rejection_reasons() {
   state__json | base__jq -c --arg repo "$1" --argjson cfg "$(config__get .repos)" \
     --argjson infos "$2" \
     'import "admit" as admit;
-      . as $state | $infos | admit::package_rules_apply($state; $cfg; $repo)'
+      . as $state | $infos | admit::add_package_rejection_reasons($state; $cfg; $repo)'
 }
 
 ################################################################################
 # Rejects the release on any version or package rule; else admits its packages.
 # Arguments:
-#   <outdir> <owner/repo> <packages (read_packages)>
+#   <outdir> <owner/repo> <packages (read_package_metadata)>
 ################################################################################
-check_packages() {
+admit_or_reject_packages() {
   local out=$1 repo=$2 infos=$3 reasons checked
-  mapfile -t reasons < <(version_reasons "$infos")
-  checked=$(apply_package_rules "$repo" "$infos")
+  mapfile -t reasons < <(version_rejection_reasons "$infos")
+  checked=$(package_rejection_reasons "$repo" "$infos")
   mapfile -t -O "${#reasons[@]}" reasons < <(jq -r '.[].reasons[]' <<< "$checked")
-  [[ ${#reasons[@]} -eq 0 ]] || finish "$out" rejected "${reasons[@]}"
-  set_result "$out" '.packages = [$c[] | del(.reasons)
+  [[ ${#reasons[@]} -eq 0 ]] || finish_admission "$out" rejected "${reasons[@]}"
+  update_result "$out" '.packages = [$c[] | del(.reasons)
     + {path: "files/\(.filename)", status: "published"}]' --argjson c "$checked"
-  finish "$out" published
+  finish_admission "$out" published
 }
 
 ################################################################################
 # Admits one release: writes a pending result.json, then runs the checks in order. The first
-# that fails ends the admission (finish exits).
+# that fails ends the admission (finish_admission exits).
 # Arguments:
 #   <owner/repo> <tag> <outdir>
 ################################################################################
@@ -253,18 +260,19 @@ main() {
   mkdir -p "$3/release" "$3/files"
   out=$(cd "$3" && pwd)
   jq -n --arg key "$repo@$tag" --arg repo "$repo" --arg tag "$tag" \
-    --arg at "$(base__timestamp_utc)" --arg run "$(github__run_url)" '{key: $key, repo: $repo,
-      tag: $tag, status: "pending", at: $at, run: $run, reasons: [], packages: []}' \
+    --arg at "$(base__timestamp_utc)" --arg run "$(github__current_run_url)" \
+    '{key: $key, repo: $repo, tag: $tag, status: "pending", at: $at, run: $run, reasons: [],
+      packages: []}' \
     > "$out/result.json"
-  fetch_sidecars "$out" "$repo" "$tag"
-  check_publisher "$out" "$repo" "$tag"
-  verify_chain "$out" "$repo"
-  check_denied_key "$out" "$repo"
+  download_sidecars "$out" "$repo" "$tag"
+  reject_if_publisher_not_allowed "$out" "$repo" "$tag"
+  verify_trust_chain "$out" "$repo"
+  reject_if_repo_key_denied "$out" "$repo"
   checksums=$(read_checksums "$out")
-  fetch_packages "$out" "$repo" "$checksums"
-  infos=$(read_packages "$out" "$checksums")
-  check_prerelease "$out" "$infos"
-  check_packages "$out" "$repo" "$infos"
+  download_packages "$out" "$repo" "$checksums"
+  infos=$(read_package_metadata "$out" "$checksums")
+  skip_if_prerelease "$out" "$infos"
+  admit_or_reject_packages "$out" "$repo" "$infos"
 }
 
 [[ $# -eq 3 ]] || log__fatal "usage: admit.sh <owner/repo> <tag> <outdir>"

@@ -21,8 +21,9 @@ KEYRING=openchami-keyring
 #   The version on stdout.
 ################################################################################
 next_version() {
-  state__json | base__jq -r --arg n "$KEYRING" \
-    'import "keyring" as keyring; keyring::next_version($n)'
+  state__json | base__jq -r --arg n "$KEYRING@" 'import "version" as version;
+    [keys[] | select(startswith($n)) | ltrimstr($n) | version::parse_semver]
+    | (max // [1, 0, -1]) | "\(.[0]).\(.[1]).\(.[2] + 1)"'
 }
 
 ################################################################################
@@ -56,7 +57,7 @@ write_result() {
       '. + [$i + {sha256: $sha, path: "files/\($i.filename)", status: "published"}]' <<< "$pkgs")
   done
   jq -n --arg repo "$KEYRING" --arg v "$version" --arg at "$(base__timestamp_utc)" \
-    --arg run "$(github__run_url)" --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo,
+    --arg run "$(github__current_run_url)" --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo,
       tag: $v, status: "published", at: $at, run: $run, repo_key: null, reasons: [],
       packages: $p}' > "$dest"
 }

@@ -2,8 +2,8 @@
 # Repository metadata updates for publish, prune, and rekey, without downloading old packages.
 # Needs keys__archive_load first.
 
-[[ -n ${_LIB_REPO_SH:-} ]] && return 0
-_LIB_REPO_SH=1
+[[ -n ${_LIB_METADATA_SH:-} ]] && return 0
+_LIB_METADATA_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
@@ -17,7 +17,7 @@ RPM_COMPRESS=(--general-compress-type=gz --no-database --quiet)
 # Outputs:
 #   The architectures on stdout, one per line.
 ################################################################################
-repo__deb_architectures() {
+metadata__deb_architectures() {
   config__get .architectures.deb | jq -r '.[] | select(. != "all")'
 }
 
@@ -30,7 +30,7 @@ repo__deb_architectures() {
 # Outputs:
 #   The directory holding the new repodata/ on stdout.
 ################################################################################
-repo__rpm_metadata_build() {
+metadata__rpm_build() {
   local work=$1 new=$2 excludes=$3 old=$1/rpm-old have_old=false have_new=false href f
   mkdir -p "$old/repodata" "$new/packages"
   if target__file_get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
@@ -75,7 +75,7 @@ repo__rpm_metadata_build() {
 # Arguments:
 #   <dir holding repodata/>
 ################################################################################
-repo__rpm_metadata_write() {
+metadata__rpm_write() {
   local dir=$1 f
   for f in "$dir"/repodata/*; do
     case ${f##*/} in
@@ -100,7 +100,7 @@ repo__rpm_metadata_write() {
 # Outputs:
 #   The kept stanzas on stdout.
 ################################################################################
-repo__apt_packages_filter() {
+metadata__apt_packages_filter() {
   awk -v ex="$1" -v arch="$2" '
     BEGIN { while ((getline l < ex) > 0) skip[l] = 1; RS = ""; ORS = "\n\n" }
     {
@@ -122,19 +122,19 @@ repo__apt_packages_filter() {
 # Outputs:
 #   The directory holding the new dists/ on stdout.
 ################################################################################
-repo__apt_metadata_build() {
+metadata__apt_build() {
   local work=$1 new=$2 excludes=$3 out=$1/apt-out arch
   local dist=$out/dists/$SUITE
   mkdir -p "$new/pool"
   (cd "$new" && apt-ftparchive packages pool 2> /dev/null) > "$work/new.Packages"
-  for arch in $(repo__deb_architectures); do
+  for arch in $(metadata__deb_architectures); do
     local bin=$dist/main/binary-$arch
     mkdir -p "$bin"
     target__file_get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
       || : > "$work/old.Packages.$arch"
     {
-      repo__apt_packages_filter "$excludes" "" < "$work/old.Packages.$arch"
-      repo__apt_packages_filter /dev/null "$arch" < "$work/new.Packages"
+      metadata__apt_packages_filter "$excludes" "" < "$work/old.Packages.$arch"
+      metadata__apt_packages_filter /dev/null "$arch" < "$work/new.Packages"
     } > "$bin/Packages"
     gzip -9nc "$bin/Packages" > "$bin/Packages.gz"
   done
@@ -143,11 +143,11 @@ repo__apt_metadata_build() {
     -o APT::FTPArchive::Release::Label=OpenCHAMI \
     -o APT::FTPArchive::Release::Suite="$SUITE" \
     -o APT::FTPArchive::Release::Codename="$SUITE" \
-    -o APT::FTPArchive::Release::Architectures="$(repo__deb_architectures | xargs)" \
+    -o APT::FTPArchive::Release::Architectures="$(metadata__deb_architectures | xargs)" \
     -o APT::FTPArchive::Release::Components=main \
     release "dists/$SUITE") > "$work/Release"
   mv "$work/Release" "$dist/Release"
-  repo__apt_release_sign "$dist"
+  metadata__apt_release_sign "$dist"
   echo "$out"
 }
 
@@ -156,7 +156,7 @@ repo__apt_metadata_build() {
 # Arguments:
 #   <dist dir holding Release>
 ################################################################################
-repo__apt_release_sign() {
+metadata__apt_release_sign() {
   rm -f "$1/InRelease" "$1/Release.gpg"
   gpg --batch --clearsign -o "$1/InRelease" "$1/Release"
   gpg --batch --armor --detach-sign -o "$1/Release.gpg" "$1/Release"
@@ -167,9 +167,9 @@ repo__apt_release_sign() {
 # Arguments:
 #   <dir holding dists/>
 ################################################################################
-repo__apt_metadata_write() {
+metadata__apt_write() {
   local dist=$1/dists/$SUITE arch f
-  for arch in $(repo__deb_architectures); do
+  for arch in $(metadata__deb_architectures); do
     for f in Packages Packages.gz; do
       target__file_put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
     done

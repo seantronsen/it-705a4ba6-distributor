@@ -89,7 +89,7 @@ keys__rpm_resign() {
 # Globals:
 #   ARCHIVE_PUB (keys__archive_load)
 ################################################################################
-keys__public_publish() {
+keys__publish() {
   local f
   if [[ ! -f $ROOT/keys/archive.asc ]]; then
     target__file_put "$ARCHIVE_PUB" keys/archive.asc

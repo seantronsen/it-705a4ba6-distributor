@@ -11,7 +11,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 if [[ -z ${CONFIG_JSON:-} ]]; then
   CONFIG_JSON=$(yq -o=json -I=0 . "$CONFIG" \
     | base__jq -c --slurpfile s "$ROOT/config/repos.schema.json" \
-      'import "config" as config; config::with_defaults($s[0])') \
+      'import "config" as config; config::fill_repo_defaults($s[0])') \
     || log__fatal "can't read $CONFIG"
   export CONFIG_JSON
 fi

@@ -13,7 +13,7 @@
 _LIB_BASE_SH=1
 
 set -euo pipefail
-# set -e in $(...) too: e.g. a signing failure inside meta=$(repo__rpm_metadata_build ...) fails the
+# set -e in $(...) too: e.g. a signing failure inside meta=$(metadata__rpm_build ...) fails the
 # script instead of publishing an empty signature.
 shopt -s inherit_errexit
 
@@ -43,3 +43,14 @@ base__timestamp_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 #   jq's arguments.
 ################################################################################
 base__jq() { jq -L "$ROOT/scripts/jq" "$@"; }
+
+################################################################################
+# Percent-encodes a string for a URL.
+# Arguments:
+#   The string.
+# Outputs:
+#   The encoded string on stdout.
+################################################################################
+base__uri_encode() {
+  jq -rn --arg s "$1" '$s | @uri'
+}

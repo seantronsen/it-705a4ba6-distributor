@@ -13,19 +13,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 # Outputs:
 #   The URL on stdout.
 ################################################################################
-github__run_url() {
+github__current_run_url() {
   echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-}
-
-################################################################################
-# Percent-encodes a string for a URL.
-# Arguments:
-#   The string.
-# Outputs:
-#   The encoded string on stdout.
-################################################################################
-github__uri_encode() {
-  jq -rn --arg s "$1" '$s | @uri'
 }
 
 ################################################################################
@@ -48,7 +37,7 @@ github__release_list() {
 #   A JSON array of {name, id} on stdout.
 ################################################################################
 github__release_asset_list() {
-  gh api "repos/$1/releases/tags/$(github__uri_encode "$2")" | jq -c '[.assets[] | {name, id}]'
+  gh api "repos/$1/releases/tags/$(base__uri_encode "$2")" | jq -c '[.assets[] | {name, id}]'
 }
 
 ################################################################################
@@ -67,7 +56,7 @@ github__release_asset_list() {
 github__tag_push_actor_list() {
   local repo=$1 tag=$2 runs reruns run count n
   runs=$(gh api --paginate \
-      "repos/$repo/actions/runs?event=push&branch=$(github__uri_encode "$tag")&per_page=100" \
+      "repos/$repo/actions/runs?event=push&branch=$(base__uri_encode "$tag")&per_page=100" \
       --jq '.workflow_runs[]' \
     | jq -c --arg t "$tag" 'select(.event == "push" and .head_branch == $t)
         | {run: .id, attempt: .run_attempt, actor, triggering_actor}') || return 1
@@ -107,7 +96,7 @@ github__release_asset_download() {
 ################################################################################
 github__issue_find_open() {
   gh api \
-    "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(github__uri_encode "$2")&per_page=100" \
+    "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(base__uri_encode "$2")&per_page=100" \
     | jq -r --arg t "$1" '[.[] | select(.title == $t)][0].number // empty'
 }
 
@@ -118,7 +107,7 @@ github__issue_find_open() {
 # Arguments:
 #   <title> <label> <body>
 ################################################################################
-github__issue_ensure() {
+github__issue_ensure_open() {
   local number
   number=$(github__issue_find_open "$1" "$2")
   if [[ -n $number ]]; then

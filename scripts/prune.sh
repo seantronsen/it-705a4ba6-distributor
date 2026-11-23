@@ -12,7 +12,7 @@ source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/keys.sh"
 source "$(dirname "$0")/lib/package.sh"
-source "$(dirname "$0")/lib/repo.sh"
+source "$(dirname "$0")/lib/metadata.sh"
 source "$(dirname "$0")/lib/state.sh"
 source "$(dirname "$0")/lib/target.sh"
 
@@ -25,7 +25,8 @@ source "$(dirname "$0")/lib/target.sh"
 ################################################################################
 denied_packages() {
   state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
-    'import "deny" as deny; deny::package_list($cfg) | map(select(.format == $fmt))'
+    'import "state" as state;
+      state::published_packages_with_denied_key($cfg) | map(select(.format == $fmt))'
 }
 
 ################################################################################
@@ -69,7 +70,9 @@ orphan_paths() {
   local fmt=$1 pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
   comm -23 <(target__file_list_tree "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
-    'import "prune" as prune; prune::published_paths($fmt)' | sort)
+    'import "state" as state; state::published_packages[] | select(.format == $fmt)
+      | if $fmt == "rpm" then "rpm/packages/\(.filename)"
+        else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' | sort)
 }
 
 ################################################################################
@@ -104,11 +107,11 @@ rewrite_metadata() {
   local fmt=$1 excludes=$2 work meta
   work=$(mktemp -d)
   if [[ $fmt == rpm ]]; then
-    meta=$(repo__rpm_metadata_build "$work" "$work/new" "$excludes")
-    repo__rpm_metadata_write "$meta"
+    meta=$(metadata__rpm_build "$work" "$work/new" "$excludes")
+    metadata__rpm_write "$meta"
   else
-    meta=$(repo__apt_metadata_build "$work" "$work/new" "$excludes")
-    repo__apt_metadata_write "$meta"
+    meta=$(metadata__apt_build "$work" "$work/new" "$excludes")
+    metadata__apt_write "$meta"
   fi
 }
 

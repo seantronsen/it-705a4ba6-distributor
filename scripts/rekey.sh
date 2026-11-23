@@ -9,7 +9,7 @@
 # carry no signature). Both republish keys/.
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/keys.sh"
-source "$(dirname "$0")/lib/repo.sh"
+source "$(dirname "$0")/lib/metadata.sh"
 source "$(dirname "$0")/lib/state.sh"
 source "$(dirname "$0")/lib/target.sh"
 
@@ -42,11 +42,11 @@ resign_batch() {
       || log__fatal "rpm/packages/$f is in state but not on the target"
     keys__rpm_resign "$dir/new/packages/$f"
   done < "$dir/excludes"
-  meta=$(repo__rpm_metadata_build "$dir/meta" "$dir/new" "$dir/excludes")
+  meta=$(metadata__rpm_build "$dir/meta" "$dir/new" "$dir/excludes")
   while IFS= read -r f; do
     target__file_put "$dir/new/packages/$f" "rpm/packages/$f"
   done < "$dir/excludes"
-  repo__rpm_metadata_write "$meta"
+  metadata__rpm_write "$meta"
 }
 
 ################################################################################
@@ -82,7 +82,7 @@ rekey_rpm() {
 rekey_deb() {
   local work=$1
   target__file_get "deb/dists/$SUITE/Release" "$work/dist/Release" || return 0
-  repo__apt_release_sign "$work/dist"
+  metadata__apt_release_sign "$work/dist"
   target__file_put "$work/dist/Release.gpg" "deb/dists/$SUITE/Release.gpg"
   target__file_put "$work/dist/InRelease" "deb/dists/$SUITE/InRelease"
 }
@@ -100,7 +100,7 @@ main() {
   keys__archive_load
   work=$(mktemp -d)
   if [[ $fmt == rpm ]]; then rekey_rpm "$delta" "$work"; else rekey_deb "$work"; fi
-  keys__public_publish
+  keys__publish
   log__info "rekey $fmt: done ($(target__url))"
 }
 

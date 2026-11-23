@@ -9,7 +9,7 @@
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/keys.sh"
 source "$(dirname "$0")/lib/package.sh"
-source "$(dirname "$0")/lib/repo.sh"
+source "$(dirname "$0")/lib/metadata.sh"
 source "$(dirname "$0")/lib/target.sh"
 
 ################################################################################
@@ -25,8 +25,10 @@ admitted_packages() {
   shift
   for d in "$@"; do
     d=$(cd "$d" && pwd)
-    new=$(base__jq -c --arg fmt "$fmt" --arg d "$d" --slurpfile r "$d/result.json" \
-      'import "publish" as publish; . + publish::admitted($r[0]; $fmt; $d)' <<< "$new")
+    new=$(jq -c --arg fmt "$fmt" --arg d "$d" --slurpfile r "$d/result.json" '. + [$r[0]
+      | select(.status == "published") | .key as $k
+      | .packages[] | select(.format == $fmt) | . + {release: $k, path: "\($d)/\(.path)"}]' \
+      <<< "$new")
   done
   echo "$new"
 }
@@ -111,17 +113,17 @@ main() {
   excludes "$fmt" "$new" > "$work/excludes"
   stage_packages "$fmt" "$new" "$work/new"
   if [[ $fmt == rpm ]]; then
-    meta=$(repo__rpm_metadata_build "$work" "$work/new" "$work/excludes")
+    meta=$(metadata__rpm_build "$work" "$work/new" "$work/excludes")
   else
-    meta=$(repo__apt_metadata_build "$work" "$work/new" "$work/excludes")
+    meta=$(metadata__apt_build "$work" "$work/new" "$work/excludes")
   fi
   upload_packages "$fmt" "$new" "$work/new"
   if [[ $fmt == rpm ]]; then
-    repo__rpm_metadata_write "$meta"
+    metadata__rpm_write "$meta"
   else
-    repo__apt_metadata_write "$meta"
+    metadata__apt_write "$meta"
   fi
-  keys__public_publish
+  keys__publish
   log__info "publish $fmt: done ($(target__url))"
 }
 
