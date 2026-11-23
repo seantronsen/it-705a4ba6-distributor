@@ -61,6 +61,21 @@ write_prune_delta() {
 }
 
 ################################################################################
+# A format's published packages' paths on the target.
+# Arguments:
+#   <rpm|deb>
+# Outputs:
+#   The paths on stdout, one per line.
+################################################################################
+published_package_paths() {
+  local fmt=$1 name filename
+  while IFS=$'\t' read -r name filename; do
+    package__target_path "$fmt" "$name" "$filename"
+  done < <(state__json | base__jq -r --arg fmt "$fmt" 'import "state" as state;
+    state::published_packages[] | select(.format == $fmt) | [.name, .filename] | @tsv')
+}
+
+################################################################################
 # A format's package files on the target that state doesn't list as published.
 # Arguments:
 #   <rpm|deb>
@@ -70,10 +85,7 @@ write_prune_delta() {
 orphan_package_paths() {
   local fmt=$1 pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-  comm -23 <(target__file_list_tree "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
-    'import "state" as state; state::published_packages[] | select(.format == $fmt)
-      | if $fmt == "rpm" then "rpm/packages/\(.filename)"
-        else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' | sort)
+  comm -23 <(target__file_list_tree "$pkgdir" | sort) <(published_package_paths "$fmt" | sort)
 }
 
 ################################################################################
