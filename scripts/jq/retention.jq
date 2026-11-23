@@ -4,7 +4,7 @@ import "version" as version;
 
 # Adds `keep: true|false` to each candidate package (input: [{repo, name, arch, version, ...}]).
 # Per (name, arch): majors N and N-1 keep the latest patch of each minor, older majors go;
-# `retain` versions and `keep-releases` lines are always kept.
+# `retain` versions and `keep_releases` lines are always kept.
 def apply($cfg):
   group_by([.name, .arch])
   | map(
@@ -17,7 +17,7 @@ def apply($cfg):
           | . + {keep: (
               ($p.latest and $p.v[0] >= $n - 1)
               or (($rc.retain // []) | any(.package == $p.name and .version == $p.version))
-              or ($p.latest and (($rc["keep-releases"] // [])
+              or ($p.latest and (($rc.keep_releases // [])
                 | any(. == "\($p.v[0]).\($p.v[1])")))
             )})
       | map(del(.v, .latest)))

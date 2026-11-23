@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Discover: list releases not yet in state.
 # Prints a JSON matrix of {repo, tag}: the oldest new releases first, at most the config's
-# max-releases; the rest wait for the next polls.
+# max_releases; the rest wait for the next polls.
 source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/config.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/state.sh"
 
 cfg=$(config__get .repos)
-max=$(config__get '.["max-releases"]')
+max=$(config__get .max_releases)
 
 # State goes to jq on stdin: it outgrows the command-line argument limit.
 new=$(mktemp)

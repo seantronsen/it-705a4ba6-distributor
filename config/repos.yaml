@@ -31,7 +31,7 @@
 #                       any value, e.g. us-east-1)
 #   target.s3.endpoint: endpoint URL, for S3-compatible services other than
 #                       AWS (optional)
-#   target.s3.metadata-max-age: seconds caches (a CDN) may keep metadata and
+#   target.s3.metadata_max_age: seconds caches (a CDN) may keep metadata and
 #                       keys before refetching (required; e.g. 300).
 #                       Packages are always cached indefinitely.
 #
@@ -41,7 +41,7 @@
 # TODO: the real bucket (a group decision, docs/deployment.md). Until it exists
 # and the secrets are set, every poll fails at its keys job.
 target:
-  s3: {bucket: openchami-packages, region: us-east-1, metadata-max-age: 300}
+  s3: {bucket: openchami-packages, region: us-east-1, metadata_max_age: 300}
 
 # -------------------------------------------------------------------------
 # Publishing
@@ -56,14 +56,14 @@ architectures:
 
 # The most releases one poll admits, oldest first (required; 1 to 256, GitHub's
 # limit on a job matrix). The rest wait for the next polls.
-max-releases: 256
+max_releases: 256
 
 # Days before the archive key expires that polls start failing and the
 # "Archive key expiring" issue opens; also the grace period after
 # keys/archive-next.asc is committed before the "Archive key switch due" issue
 # opens (required).
-archive-key:
-  warn-days: 30
+archive_key:
+  warn_days: 30
 
 # -------------------------------------------------------------------------
 # Publishers
@@ -144,20 +144,20 @@ publishers:
 #     version: major.minor.patch (required).
 #     reason:  why (optional; for readers).
 #
-#   keep-releases: major.minor lines kept past end of life (optional): the
+#   keep_releases: major.minor lines kept past end of life (optional): the
 #                  latest patch of each stays even once its major is two or
 #                  more behind. Quote them: unquoted 1.10 reads as 1.1.
 #
 # Default retention, per package and architecture (an assumption pending group
 # discussion): the current major and the one before keep the latest patch of
 # each minor; superseded patches and older majors are pruned, except what
-# retain or keep-releases keeps.
+# retain or keep_releases keeps.
 #
 # Example:
 #
 #   repos:
 #     OpenCHAMI/smd:
-#       keep-releases: ["1.4"]
+#       keep_releases: ["1.4"]
 #       retain:
 #         - {package: smd, version: "2.19.4", reason: pinned by a live deployment}
 #     OpenCHAMI/release:

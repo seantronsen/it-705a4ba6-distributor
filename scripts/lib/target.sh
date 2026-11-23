@@ -32,7 +32,7 @@ target__aws() {
 
 ################################################################################
 # A file's Cache-Control: packages never change; metadata and keys do, so caches (a CDN)
-# refetch them after target.s3.metadata-max-age seconds.
+# refetch them after target.s3.metadata_max_age seconds.
 # Arguments:
 #   <path>
 # Outputs:
@@ -41,7 +41,7 @@ target__aws() {
 target__cache_control() {
   case $1 in
     rpm/packages/* | deb/pool/*) echo 'public,max-age=31536000,immutable' ;;
-    *) echo "public,max-age=$(config__get '.target.s3["metadata-max-age"]'),must-revalidate" ;;
+    *) echo "public,max-age=$(config__get .target.s3.metadata_max_age),must-revalidate" ;;
   esac
 }
 
