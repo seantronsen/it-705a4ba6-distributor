@@ -25,9 +25,9 @@ SWITCH_DUE="Archive key switch due"
 ################################################################################
 days_to_expiry() {
   local expires
-  expires=$(gpg --batch --with-colons --list-keys "$ARCHIVE_FPR" \
-    | awk -F: '($1=="pub" || ($1=="sub" && $12 ~ /s/)) && $7 != "" {print $7}' | sort -n | head -1)
-  [[ -z $expires ]] || echo $(((expires - $(date +%s)) / 86400))
+  expires="$(gpg --batch --with-colons --list-keys "${ARCHIVE_FPR}" \
+    | awk -F: '($1=="pub" || ($1=="sub" && $12 ~ /s/)) && $7 != "" {print $7}' | sort -n | head -1)"
+  [[ -z "${expires}" ]] || echo $(((expires - $(date +%s)) / 86400))
 }
 
 ################################################################################
@@ -38,17 +38,17 @@ days_to_expiry() {
 #   1 within the warning days of expiry, so the run fails.
 ################################################################################
 fail_if_archive_key_expiring() {
-  local warn_days=$1 days
-  days=$(days_to_expiry)
-  if [[ -n $days && $days -lt $warn_days ]]; then
-    log__info "check-keys: archive key $ARCHIVE_FPR expires in $days day(s)"
-    github__issue_ensure_open "$EXPIRING" archive-key \
-      "Archive key \`$ARCHIVE_FPR\` expires in $days day(s). Rotate it (spec-deferred.md, Archive \
-key management). Run: $(github__current_run_url)"
+  local warn_days="$1" days
+  days="$(days_to_expiry)"
+  if [[ -n "${days}" && "${days}" -lt "${warn_days}" ]]; then
+    log__info "check-keys: archive key ${ARCHIVE_FPR} expires in ${days} day(s)"
+    github__issue_ensure_open "${EXPIRING}" archive-key \
+      "Archive key \`${ARCHIVE_FPR}\` expires in ${days} day(s). Rotate it (spec-deferred.md, \
+Archive key management). Run: $(github__current_run_url)"
     return 1
   fi
-  github__issue_close "$EXPIRING" archive-key \
-    "The archive key no longer expires within $warn_days days."
+  github__issue_close "${EXPIRING}" archive-key \
+    "The archive key no longer expires within ${warn_days} days."
 }
 
 ################################################################################
@@ -58,9 +58,10 @@ key management). Run: $(github__current_run_url)"
 ################################################################################
 days_since_next_key_committed() {
   local added
-  [[ -f $ROOT/keys/archive-next.asc ]] || return 0
-  added=$(git -C "$ROOT" log --diff-filter=A --format=%ct -- keys/archive-next.asc | tail -1)
-  [[ -n $added ]] || log__fatal "keys/archive-next.asc has no history (check out with full history)"
+  [[ -f "${ROOT}/keys/archive-next.asc" ]] || return 0
+  added="$(git -C "${ROOT}" log --diff-filter=A --format=%ct -- keys/archive-next.asc | tail -1)"
+  [[ -n "${added}" ]] \
+    || log__fatal "keys/archive-next.asc has no history (check out with full history)"
   echo $((($(date +%s) - added) / 86400))
 }
 
@@ -70,14 +71,14 @@ days_since_next_key_committed() {
 #   <grace period, days>
 ################################################################################
 update_switch_due_issue() {
-  local warn_days=$1 days
-  days=$(days_since_next_key_committed)
-  if [[ -z $days ]]; then
-    github__issue_close "$SWITCH_DUE" archive-key \
+  local warn_days="$1" days
+  days="$(days_since_next_key_committed)"
+  if [[ -z "${days}" ]]; then
+    github__issue_close "${SWITCH_DUE}" archive-key \
       "keys/archive-next.asc is gone: the switch is done."
-  elif [[ $days -ge $warn_days ]]; then
-    github__issue_ensure_open "$SWITCH_DUE" archive-key \
-      "\`keys/archive-next.asc\` was committed $days days ago, so clients have had the keyring \
+  elif [[ "${days}" -ge "${warn_days}" ]]; then
+    github__issue_ensure_open "${SWITCH_DUE}" archive-key \
+      "\`keys/archive-next.asc\` was committed ${days} days ago, so clients have had the keyring \
 carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, step 3)."
   fi
 }
@@ -88,11 +89,11 @@ carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, s
 main() {
   local warn_days
   base__env_require GITHUB_TOKEN GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID ARCHIVE_GPG_KEY
-  warn_days=$(config__get .archive_key.warn_days)
+  warn_days="$(config__get .archive_key.warn_days)"
   keys__archive_load
-  update_switch_due_issue "$warn_days"
-  fail_if_archive_key_expiring "$warn_days"
-  log__info "check-keys: archive key $ARCHIVE_FPR OK"
+  update_switch_due_issue "${warn_days}"
+  fail_if_archive_key_expiring "${warn_days}"
+  log__info "check-keys: archive key ${ARCHIVE_FPR} OK"
 }
 
 main "$@"

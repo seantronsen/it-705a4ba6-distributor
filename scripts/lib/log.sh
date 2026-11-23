@@ -2,7 +2,7 @@
 # Logging for the distributor scripts: timestamped lines on stderr, so stdout stays the scripts'
 # output. The same format as the integration suite's lib/log.sh, without its bats parts.
 
-[[ -n ${_LIB_LOG_SH:-} ]] && return 0
+[[ -n "${_LIB_LOG_SH:-}" ]] && return 0
 _LIB_LOG_SH=1
 
 ################################################################################
@@ -13,9 +13,9 @@ _LIB_LOG_SH=1
 #   "[HH:MM:SS] <LEVEL> <message>" (UTC) on stderr.
 ################################################################################
 log__base() {
-  local level=$1
+  local level="$1"
   shift
-  TZ=UTC printf '[%(%H:%M:%S)T] %s %s\n' -1 "$level" "$*" >&2
+  TZ=UTC printf '[%(%H:%M:%S)T] %s %s\n' -1 "${level}" "$*" >&2
 }
 
 ################################################################################

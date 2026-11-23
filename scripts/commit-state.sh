@@ -22,15 +22,15 @@ main() {
   local attempt
   base__env_require GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID GITHUB_REF_NAME \
     GITHUB_WORKFLOW
-  if [[ $# -eq 0 ]]; then
+  if [[ "$#" -eq 0 ]]; then
     log__info 'Nothing to record.'
     return
   fi
-  cd "$ROOT" || exit 1
+  cd "${ROOT}" || exit 1
   git config user.name 'github-actions[bot]'
   git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
   for attempt in $(seq 1 3); do
-    git fetch --quiet origin "$GITHUB_REF_NAME"
+    git fetch --quiet origin "${GITHUB_REF_NAME}"
     git reset --quiet --hard FETCH_HEAD
     scripts/record.sh state "$@"
     scripts/validate.sh schemas/state.schema.json state/state.json
@@ -39,9 +39,9 @@ main() {
       log__info 'State unchanged.'
       return
     fi
-    git commit --quiet -m "state: $GITHUB_WORKFLOW $(github__current_run_url)"
-    git push --quiet origin "HEAD:$GITHUB_REF_NAME" && return
-    log__info "Push failed (attempt $attempt); retrying on the latest state."
+    git commit --quiet -m "state: ${GITHUB_WORKFLOW} $(github__current_run_url)"
+    git push --quiet origin "HEAD:${GITHUB_REF_NAME}" && return
+    log__info "Push failed (attempt ${attempt}); retrying on the latest state."
   done
   log__fatal "couldn't push the state after 3 attempts"
 }

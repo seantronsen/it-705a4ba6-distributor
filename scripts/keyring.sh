@@ -24,7 +24,7 @@ KEYRING=openchami-keyring
 #   The version on stdout.
 ################################################################################
 next_keyring_version() {
-  state__json | base__jq -r --arg n "$KEYRING@" 'import "version" as version;
+  state__json | base__jq -r --arg n "${KEYRING}@" 'import "version" as version;
     [keys[] | select(startswith($n)) | ltrimstr($n) | version::parse_semver]
     | (max // [1, 0, -1]) | "\(.[0]).\(.[1]).\(.[2] + 1)"'
 }
@@ -38,13 +38,15 @@ next_keyring_version() {
 #   <dest>
 ################################################################################
 export_public_keys() {
-  local dest=$1 home keys=("$ROOT"/keys/*.asc) k
-  [[ -f $ROOT/keys/archive.asc ]] || keys=("$ARCHIVE_PUB")
-  home=$(mktemp -d)
-  chmod 700 "$home"
-  for k in "${keys[@]}"; do gpg --homedir "$home" --batch --quiet --import "$k" 2> /dev/null; done
-  gpg --homedir "$home" --batch --armor --export > "$dest"
-  [[ -s $dest ]] || log__fatal "no keys to package"
+  local dest="$1" home keys=("${ROOT}"/keys/*.asc) k
+  [[ -f "${ROOT}/keys/archive.asc" ]] || keys=("${ARCHIVE_PUB}")
+  home="$(mktemp -d)"
+  chmod 700 "${home}"
+  for k in "${keys[@]}"; do
+    gpg --homedir "${home}" --batch --quiet --import "${k}" 2> /dev/null
+  done
+  gpg --homedir "${home}" --batch --armor --export > "${dest}"
+  [[ -s "${dest}" ]] || log__fatal "no keys to package"
 }
 
 ################################################################################
@@ -53,16 +55,17 @@ export_public_keys() {
 #   <version> <files dir> <dest>
 ################################################################################
 write_admit_result() {
-  local version=$1 files=$2 dest=$3 f pkgs='[]'
-  for f in "$files"/*; do
-    pkgs=$(jq -c --argjson i "$(package__metadata "$f")" \
-      --arg sha "$(sha256sum "$f" | cut -d' ' -f1)" \
-      '. + [$i + {sha256: $sha, path: "files/\($i.filename)", status: "published"}]' <<< "$pkgs")
+  local version="$1" files="$2" dest="$3" f pkgs='[]'
+  for f in "${files}"/*; do
+    pkgs="$(jq -c --argjson i "$(package__metadata "${f}")" \
+      --arg sha "$(sha256sum "${f}" | cut -d' ' -f1)" \
+      '. + [$i + {sha256: $sha, path: "files/\($i.filename)", status: "published"}]' <<< "${pkgs}")"
   done
-  jq -n --arg repo "$KEYRING" --arg v "$version" --arg at "$(base__timestamp_utc)" \
-    --arg run "$(github__current_run_url)" --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo,
+  jq -n --arg repo "${KEYRING}" --arg v "${version}" --arg at "$(base__timestamp_utc)" \
+    --arg run "$(github__current_run_url)" --argjson p "${pkgs}" \
+    '{key: "\($repo)@\($v)", repo: $repo,
       tag: $v, status: "published", at: $at, run: $run, repo_key: null, reasons: [],
-      packages: $p}' > "$dest"
+      packages: $p}' > "${dest}"
 }
 
 ################################################################################
@@ -71,10 +74,10 @@ write_admit_result() {
 #   <version> <files dir>
 ################################################################################
 build_keyring_packages() {
-  local version=$1 files=$2 fmt
+  local version="$1" files="$2" fmt
   for fmt in rpm deb; do
-    (cd "$ROOT" && KEYRING_VERSION=$version nfpm package -f keyring/nfpm.yaml -p "$fmt" \
-      -t "$files/" > /dev/null) || log__fatal "nfpm failed to build the $fmt keyring"
+    (cd "${ROOT}" && KEYRING_VERSION="${version}" nfpm package -f keyring/nfpm.yaml -p "${fmt}" \
+      -t "${files}/" > /dev/null) || log__fatal "nfpm failed to build the ${fmt} keyring"
   done
 }
 
@@ -87,15 +90,15 @@ main() {
   local out version
   base__env_require ARCHIVE_GPG_KEY GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID
   mkdir -p "$1/files"
-  out=$(cd "$1" && pwd)
+  out="$(cd "$1" && pwd)"
   keys__archive_load
-  version=$(next_keyring_version)
-  mkdir -p "$ROOT/keyring/build"
-  export_public_keys "$ROOT/keyring/build/keys.asc"
-  build_keyring_packages "$version" "$out/files"
-  write_admit_result "$version" "$out/files" "$out/result.json"
-  log__info "keyring: built $KEYRING@$version"
+  version="$(next_keyring_version)"
+  mkdir -p "${ROOT}/keyring/build"
+  export_public_keys "${ROOT}/keyring/build/keys.asc"
+  build_keyring_packages "${version}" "${out}/files"
+  write_admit_result "${version}" "${out}/files" "${out}/result.json"
+  log__info "keyring: built ${KEYRING}@${version}"
 }
 
-[[ $# -eq 1 ]] || log__fatal "usage: keyring.sh <outdir>"
+[[ "$#" -eq 1 ]] || log__fatal "usage: keyring.sh <outdir>"
 main "$@"

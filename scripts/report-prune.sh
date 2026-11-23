@@ -26,10 +26,10 @@ LABEL=prune-failing
 has_prune_failed_before() {
   local workflow previous
   # The calling workflow's file (e.g. poll.yml), from owner/repo/<path>@<ref>.
-  workflow=${GITHUB_WORKFLOW_REF%@*}
-  workflow=${workflow##*/}
-  previous=$(github__workflow_last_completed_run "$workflow")
-  [[ -n $previous ]] && github__run_has_failed_job "$previous" "prune / "
+  workflow="${GITHUB_WORKFLOW_REF%@*}"
+  workflow="${workflow##*/}"
+  previous="$(github__workflow_last_completed_run "${workflow}")"
+  [[ -n "${previous}" ]] && github__run_has_failed_job "${previous}" "prune / "
 }
 
 ################################################################################
@@ -41,11 +41,11 @@ has_prune_failed_before() {
 #   1 when prune failed twice in a row.
 ################################################################################
 main() {
-  local failed=$1
+  local failed="$1"
   base__env_require GITHUB_TOKEN GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID \
     GITHUB_WORKFLOW_REF
-  if [[ $failed == false ]]; then
-    github__issue_close "$TITLE" "$LABEL" \
+  if [[ "${failed}" == false ]]; then
+    github__issue_close "${TITLE}" "${LABEL}" \
       "Prune succeeded again ([run]($(github__current_run_url)))."
     return
   fi
@@ -53,10 +53,11 @@ main() {
     echo "::warning::Prune failed; the next run retries it."
     return
   fi
-  github__issue_ensure_open "$TITLE" "$LABEL" \
+  github__issue_ensure_open "${TITLE}" "${LABEL}" \
     "Prune failed in two runs in a row. Latest: $(github__current_run_url)"
   return 1
 }
 
-[[ $# -eq 1 && ($1 == true || $1 == false) ]] || log__fatal "usage: report-prune.sh <true|false>"
+[[ "$#" -eq 1 && ("$1" == true || "$1" == false) ]] \
+  || log__fatal "usage: report-prune.sh <true|false>"
 main "$@"

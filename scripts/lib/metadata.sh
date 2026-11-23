@@ -2,7 +2,7 @@
 # Repository metadata updates for publish, prune, and rekey, without downloading old packages.
 # Needs keys__archive_load first.
 
-[[ -n ${_LIB_METADATA_SH:-} ]] && return 0
+[[ -n "${_LIB_METADATA_SH:-}" ]] && return 0
 _LIB_METADATA_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
@@ -32,38 +32,38 @@ metadata__deb_architectures() {
 #   The directory holding the new repodata/ on stdout.
 ################################################################################
 metadata__rpm_build() {
-  local work=$1 new=$2 excludes=$3 old=$1/rpm-old have_old=false have_new=false href f
-  mkdir -p "$old/repodata" "$new/packages"
-  if target__file_get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
+  local work="$1" new="$2" excludes="$3" old="$1/rpm-old" have_old=false have_new=false href f
+  mkdir -p "${old}/repodata" "${new}/packages"
+  if target__file_get rpm/repodata/repomd.xml "${old}/repodata/repomd.xml"; then
     have_old=true
     while IFS= read -r href; do
-      target__file_get "rpm/$href" "$old/$href" \
-        || log__fatal "rpm/$href is referenced by repomd.xml but missing"
-    done < <(grep -o 'href="repodata/[^"]*"' "$old/repodata/repomd.xml" | cut -d'"' -f2)
-    if [[ -s $excludes ]]; then
+      target__file_get "rpm/${href}" "${old}/${href}" \
+        || log__fatal "rpm/${href} is referenced by repomd.xml but missing"
+    done < <(grep -o 'href="repodata/[^"]*"' "${old}/repodata/repomd.xml" | cut -d'"' -f2)
+    if [[ -s "${excludes}" ]]; then
       local args=()
-      while IFS= read -r f; do args+=(--excludes "packages/$f"); done < "$excludes"
-      createrepo_c "${RPM_COMPRESS[@]}" --update --skip-stat --recycle-pkglist "${args[@]}" "$old"
+      while IFS= read -r f; do args+=(--excludes "packages/${f}"); done < "${excludes}"
+      createrepo_c "${RPM_COMPRESS[@]}" --update --skip-stat --recycle-pkglist "${args[@]}" "${old}"
     fi
   fi
-  compgen -G "$new/packages/*.rpm" > /dev/null && have_new=true
-  [[ $have_new == true ]] && createrepo_c "${RPM_COMPRESS[@]}" "$new"
+  compgen -G "${new}/packages/*.rpm" > /dev/null && have_new=true
+  [[ "${have_new}" == true ]] && createrepo_c "${RPM_COMPRESS[@]}" "${new}"
 
   local result
-  if [[ $have_old == true && $have_new == true ]]; then
+  if [[ "${have_old}" == true && "${have_new}" == true ]]; then
     mergerepo_c --all --omit-baseurl --no-database --compress-type=gz \
-      --repo "$old" --repo "$new" -o "$work/rpm-merged" > /dev/null
-    result=$work/rpm-merged
-  elif [[ $have_old == true ]]; then
-    result=$old
-  elif [[ $have_new == true ]]; then
-    result=$new
+      --repo "${old}" --repo "${new}" -o "${work}/rpm-merged" > /dev/null
+    result="${work}/rpm-merged"
+  elif [[ "${have_old}" == true ]]; then
+    result="${old}"
+  elif [[ "${have_new}" == true ]]; then
+    result="${new}"
   else
-    createrepo_c "${RPM_COMPRESS[@]}" "$new"
-    result=$new
+    createrepo_c "${RPM_COMPRESS[@]}" "${new}"
+    result="${new}"
   fi
-  metadata__rpm_repomd_sign "$result/repodata"
-  echo "$result"
+  metadata__rpm_repomd_sign "${result}/repodata"
+  echo "${result}"
 }
 
 ################################################################################
@@ -85,17 +85,17 @@ metadata__rpm_repomd_sign() {
 #   <dir holding repodata/>
 ################################################################################
 metadata__rpm_write() {
-  local dir=$1 f
-  for f in "$dir"/repodata/*; do
-    case ${f##*/} in
+  local dir="$1" f
+  for f in "${dir}"/repodata/*; do
+    case "${f##*/}" in
       repomd.xml | repomd.xml.asc) ;;
-      *) target__file_put "$f" "rpm/repodata/${f##*/}" ;;
+      *) target__file_put "${f}" "rpm/repodata/${f##*/}" ;;
     esac
   done
-  target__file_put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
-  target__file_put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
+  target__file_put "${dir}/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
+  target__file_put "${dir}/repodata/repomd.xml" rpm/repodata/repomd.xml
   for f in $(target__file_list rpm/repodata); do
-    [[ -e $dir/repodata/$f ]] || target__file_delete "rpm/repodata/$f"
+    [[ -e "${dir}/repodata/${f}" ]] || target__file_delete "rpm/repodata/${f}"
   done
 }
 
@@ -132,32 +132,33 @@ metadata__apt_packages_filter() {
 #   The directory holding the new dists/ on stdout.
 ################################################################################
 metadata__apt_build() {
-  local work=$1 new=$2 excludes=$3 out=$1/apt-out arch
-  local dist=$out/dists/$SUITE
-  mkdir -p "$new/pool"
-  (cd "$new" && apt-ftparchive packages pool 2> /dev/null) > "$work/new.Packages"
+  local work="$1" new="$2" excludes="$3" out="$1/apt-out" arch
+  local dist="${out}/dists/${SUITE}"
+  mkdir -p "${new}/pool"
+  (cd "${new}" && apt-ftparchive packages pool 2> /dev/null) > "${work}/new.Packages"
   for arch in $(metadata__deb_architectures); do
-    local bin=$dist/main/binary-$arch
-    mkdir -p "$bin"
-    target__file_get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
-      || : > "$work/old.Packages.$arch"
+    local bin="${dist}/main/binary-${arch}"
+    mkdir -p "${bin}"
+    target__file_get "deb/dists/${SUITE}/main/binary-${arch}/Packages" \
+      "${work}/old.Packages.${arch}" \
+      || : > "${work}/old.Packages.${arch}"
     {
-      metadata__apt_packages_filter "$excludes" "" < "$work/old.Packages.$arch"
-      metadata__apt_packages_filter /dev/null "$arch" < "$work/new.Packages"
-    } > "$bin/Packages"
-    gzip -9nc "$bin/Packages" > "$bin/Packages.gz"
+      metadata__apt_packages_filter "${excludes}" "" < "${work}/old.Packages.${arch}"
+      metadata__apt_packages_filter /dev/null "${arch}" < "${work}/new.Packages"
+    } > "${bin}/Packages"
+    gzip -9nc "${bin}/Packages" > "${bin}/Packages.gz"
   done
-  (cd "$out" && apt-ftparchive \
+  (cd "${out}" && apt-ftparchive \
     -o APT::FTPArchive::Release::Origin=OpenCHAMI \
     -o APT::FTPArchive::Release::Label=OpenCHAMI \
-    -o APT::FTPArchive::Release::Suite="$SUITE" \
-    -o APT::FTPArchive::Release::Codename="$SUITE" \
+    -o APT::FTPArchive::Release::Suite="${SUITE}" \
+    -o APT::FTPArchive::Release::Codename="${SUITE}" \
     -o APT::FTPArchive::Release::Architectures="$(metadata__deb_architectures | xargs)" \
     -o APT::FTPArchive::Release::Components=main \
-    release "dists/$SUITE") > "$work/Release"
-  mv "$work/Release" "$dist/Release"
-  metadata__apt_release_sign "$dist"
-  echo "$out"
+    release "dists/${SUITE}") > "${work}/Release"
+  mv "${work}/Release" "${dist}/Release"
+  metadata__apt_release_sign "${dist}"
+  echo "${out}"
 }
 
 ################################################################################
@@ -177,14 +178,15 @@ metadata__apt_release_sign() {
 #   <dir holding dists/>
 ################################################################################
 metadata__apt_write() {
-  local dist=$1/dists/$SUITE arch f
+  local dist="$1/dists/${SUITE}" arch f
   for arch in $(metadata__deb_architectures); do
     for f in Packages Packages.gz; do
-      target__file_put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
+      target__file_put "${dist}/main/binary-${arch}/${f}" \
+        "deb/dists/${SUITE}/main/binary-${arch}/${f}"
     done
   done
   for f in Release Release.gpg InRelease; do
-    target__file_put "$dist/$f" "deb/dists/$SUITE/$f"
+    target__file_put "${dist}/${f}" "deb/dists/${SUITE}/${f}"
   done
 }
 
@@ -197,18 +199,18 @@ metadata__apt_write() {
 #   The files on stdout, one per line.
 ################################################################################
 metadata__excludes() {
-  local fmt=$1 packages=$2 name filename path
+  local fmt="$1" packages="$2" name filename path
   shift 2
   while IFS=$'\t' read -r name filename; do
-    if [[ $fmt == rpm ]]; then
-      echo "$filename"
+    if [[ "${fmt}" == rpm ]]; then
+      echo "${filename}"
     else
-      path=$(package__target_path deb "$name" "$filename")
+      path="$(package__target_path deb "${name}" "${filename}")"
       echo "${path#deb/}"
     fi
-  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$packages")
+  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "${packages}")
   for path in "$@"; do
-    if [[ $fmt == rpm ]]; then echo "${path##*/}"; else echo "${path#deb/}"; fi
+    if [[ "${fmt}" == rpm ]]; then echo "${path##*/}"; else echo "${path#deb/}"; fi
   done
 }
 
@@ -220,9 +222,9 @@ metadata__excludes() {
 #   The directory holding the new metadata on stdout.
 ################################################################################
 metadata__build() {
-  local fmt=$1
+  local fmt="$1"
   shift
-  if [[ $fmt == rpm ]]; then metadata__rpm_build "$@"; else metadata__apt_build "$@"; fi
+  if [[ "${fmt}" == rpm ]]; then metadata__rpm_build "$@"; else metadata__apt_build "$@"; fi
 }
 
 ################################################################################
@@ -231,5 +233,5 @@ metadata__build() {
 #   <rpm|deb> <metadata dir (metadata__build)>
 ################################################################################
 metadata__write() {
-  if [[ $1 == rpm ]]; then metadata__rpm_write "$2"; else metadata__apt_write "$2"; fi
+  if [[ "$1" == rpm ]]; then metadata__rpm_write "$2"; else metadata__apt_write "$2"; fi
 }

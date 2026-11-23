@@ -71,10 +71,10 @@ write_prune_delta() {
 #   The paths on stdout, one per line.
 ################################################################################
 published_package_paths() {
-  local fmt=$1 name filename
+  local fmt="$1" name filename
   while IFS=$'\t' read -r name filename; do
-    package__target_path "$fmt" "$name" "$filename"
-  done < <(state__json | base__jq -r --arg fmt "$fmt" 'import "state" as state;
+    package__target_path "${fmt}" "${name}" "${filename}"
+  done < <(state__json | base__jq -r --arg fmt "${fmt}" 'import "state" as state;
     state::published_packages[] | select(.format == $fmt) | [.name, .filename] | @tsv')
 }
 
@@ -86,9 +86,9 @@ published_package_paths() {
 #   Their paths on stdout, one per line.
 ################################################################################
 orphan_package_paths() {
-  local fmt=$1 pkgdir
-  if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-  comm -23 <(target__file_list_tree "$pkgdir" | sort) <(published_package_paths "$fmt" | sort)
+  local fmt="$1" pkgdir
+  if [[ "${fmt}" == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
+  comm -23 <(target__file_list_tree "${pkgdir}" | sort) <(published_package_paths "${fmt}" | sort)
 }
 
 ################################################################################
@@ -97,12 +97,12 @@ orphan_package_paths() {
 #   <rpm|deb> <remove (JSON)> [orphan path]...
 ################################################################################
 delete_package_files() {
-  local fmt=$1 remove=$2 name filename f
+  local fmt="$1" remove="$2" name filename f
   shift 2
   while IFS=$'\t' read -r name filename; do
-    target__file_delete "$(package__target_path "$fmt" "$name" "$filename")"
-  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
-  for f in "$@"; do target__file_delete "$f"; done
+    target__file_delete "$(package__target_path "${fmt}" "${name}" "${filename}")"
+  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "${remove}")
+  for f in "$@"; do target__file_delete "${f}"; done
 }
 
 ################################################################################
@@ -112,33 +112,33 @@ delete_package_files() {
 #   <rpm|deb> <outdir>
 ################################################################################
 main() {
-  local fmt=$1 out denied pruned remove work meta
+  local fmt="$1" out denied pruned remove work meta
   local -a orphans
   base__env_require ARCHIVE_GPG_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
   mkdir -p "$2"
-  out=$(cd "$2" && pwd)
-  denied=$(published_packages_with_denied_key "$fmt")
-  pruned=$(packages_pruned_by_retention "$fmt" "$denied")
-  write_prune_delta "$fmt" "$out" "$pruned" "$denied"
-  remove=$(jq -c -s 'add' <<< "$pruned $denied")
+  out="$(cd "$2" && pwd)"
+  denied="$(published_packages_with_denied_key "${fmt}")"
+  pruned="$(packages_pruned_by_retention "${fmt}" "${denied}")"
+  write_prune_delta "${fmt}" "${out}" "${pruned}" "${denied}"
+  remove="$(jq -c -s 'add' <<< "${pruned} ${denied}")"
 
-  mapfile -t orphans < <(orphan_package_paths "$fmt")
-  if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
-    log__info "prune $fmt: nothing to remove"
+  mapfile -t orphans < <(orphan_package_paths "${fmt}")
+  if [[ "$(jq length <<< "${remove}")" -eq 0 && "${#orphans[@]}" -eq 0 ]]; then
+    log__info "prune ${fmt}: nothing to remove"
     return
   fi
-  log__info "prune $fmt: $(jq length <<< "$pruned") by retention," \
-    "$(jq length <<< "$denied") for a denied repo key, ${#orphans[@]} not in state"
+  log__info "prune ${fmt}: $(jq length <<< "${pruned}") by retention," \
+    "$(jq length <<< "${denied}") for a denied repo key, ${#orphans[@]} not in state"
 
   keys__archive_load
-  work=$(mktemp -d)
-  metadata__excludes "$fmt" "$remove" "${orphans[@]}" > "$work/excludes"
-  meta=$(metadata__build "$fmt" "$work" "$work/new" "$work/excludes")
-  metadata__write "$fmt" "$meta"
-  delete_package_files "$fmt" "$remove" "${orphans[@]}"
-  log__info "prune $fmt: done ($(target__url))"
+  work="$(mktemp -d)"
+  metadata__excludes "${fmt}" "${remove}" "${orphans[@]}" > "${work}/excludes"
+  meta="$(metadata__build "${fmt}" "${work}" "${work}/new" "${work}/excludes")"
+  metadata__write "${fmt}" "${meta}"
+  delete_package_files "${fmt}" "${remove}" "${orphans[@]}"
+  log__info "prune ${fmt}: done ($(target__url))"
 }
 
-[[ $# -eq 2 ]] || log__fatal "usage: prune.sh <rpm|deb> <outdir>"
-[[ $1 == rpm || $1 == deb ]] || log__fatal "unknown format: $1"
+[[ "$#" -eq 2 ]] || log__fatal "usage: prune.sh <rpm|deb> <outdir>"
+[[ "$1" == rpm || "$1" == deb ]] || log__fatal "unknown format: $1"
 main "$@"

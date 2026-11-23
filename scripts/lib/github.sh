@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The GitHub API, through gh (GITHUB_TOKEN): releases, assets, a tag's push runs, and issues.
 
-[[ -n ${_LIB_GITHUB_SH:-} ]] && return 0
+[[ -n "${_LIB_GITHUB_SH:-}" ]] && return 0
 _LIB_GITHUB_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 #   The URL on stdout.
 ################################################################################
 github__current_run_url() {
-  echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+  echo "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 }
 
 ################################################################################
@@ -54,25 +54,25 @@ github__release_asset_list() {
 #   an infrastructure error, never an empty list.
 ################################################################################
 github__tag_push_actor_list() {
-  local repo=$1 tag=$2 runs reruns run count n
-  runs=$(gh api --paginate \
-      "repos/$repo/actions/runs?event=push&branch=$(base__uri_encode "$tag")&per_page=100" \
+  local repo="$1" tag="$2" runs reruns run count n
+  runs="$(gh api --paginate \
+      "repos/${repo}/actions/runs?event=push&branch=$(base__uri_encode "${tag}")&per_page=100" \
       --jq '.workflow_runs[]' \
-    | jq -c --arg t "$tag" 'select(.event == "push" and .head_branch == $t)
-        | {run: .id, attempt: .run_attempt, actor, triggering_actor}') || return 1
-  reruns=$(jq -r 'select(.attempt > 1) | "\(.run) \(.attempt)"' <<< "$runs") || return 1
+    | jq -c --arg t "${tag}" 'select(.event == "push" and .head_branch == $t)
+        | {run: .id, attempt: .run_attempt, actor, triggering_actor}')" || return 1
+  reruns="$(jq -r 'select(.attempt > 1) | "\(.run) \(.attempt)"' <<< "${runs}")" || return 1
   {
     jq -c '{run, attempt} as $r
       | (.actor | {login, id, type} + $r + {role: "pushed"}),
-        (.triggering_actor | {login, id, type} + $r + {role: "ran"})' <<< "$runs" || return 1
+        (.triggering_actor | {login, id, type} + $r + {role: "ran"})' <<< "${runs}" || return 1
     while read -r run count; do
       for ((n = 1; n < count; n++)); do
-        gh api "repos/$repo/actions/runs/$run/attempts/$n" \
+        gh api "repos/${repo}/actions/runs/${run}/attempts/${n}" \
           --jq '{run: .id, attempt: .run_attempt, role: "ran"}
             + (.triggering_actor | {login, id, type})' \
           || return 1
       done
-    done <<< "$reruns"
+    done <<< "${reruns}"
   } | jq -s -c .
 }
 
@@ -96,7 +96,7 @@ github__release_asset_download() {
 ################################################################################
 github__issue_find_open() {
   gh api \
-    "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(base__uri_encode "$2")&per_page=100" \
+    "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=$(base__uri_encode "$2")&per_page=100" \
     | jq -r --arg t "$1" '[.[] | select(.title == $t)][0].number // empty'
 }
 
@@ -109,9 +109,9 @@ github__issue_find_open() {
 ################################################################################
 github__issue_ensure_open() {
   local number
-  number=$(github__issue_find_open "$1" "$2")
-  if [[ -n $number ]]; then
-    log__info "issue #$number already open: $1"
+  number="$(github__issue_find_open "$1" "$2")"
+  if [[ -n "${number}" ]]; then
+    log__info "issue #${number} already open: $1"
     return
   fi
   github__issue_create "$1" "$2" "$3"
@@ -126,10 +126,10 @@ github__issue_ensure_open() {
 ################################################################################
 github__issue_close() {
   local number
-  number=$(github__issue_find_open "$1" "$2")
-  [[ -n $number ]] || return 0
-  gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$number/comments" -f body="$3" > /dev/null
-  gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$number" -f state=closed > /dev/null
+  number="$(github__issue_find_open "$1" "$2")"
+  [[ -n "${number}" ]] || return 0
+  gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${number}/comments" -f body="$3" > /dev/null
+  gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/${number}" -f state=closed > /dev/null
 }
 
 ################################################################################
@@ -140,7 +140,7 @@ github__issue_close() {
 #   <title> <label> <body>
 ################################################################################
 github__issue_create() {
-  gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f title="$1" -f body="$3" -f "labels[]=$2" \
+  gh api -X POST "repos/${GITHUB_REPOSITORY}/issues" -f title="$1" -f body="$3" -f "labels[]=$2" \
     > /dev/null
 }
 
@@ -154,7 +154,7 @@ github__issue_create() {
 #   The run's ID on stdout, or nothing when it has none.
 ################################################################################
 github__workflow_last_completed_run() {
-  gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$1/runs" \
+  gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$1/runs" \
     -X GET -f status=completed -f per_page=1 --jq '.workflow_runs[0].id // empty'
 }
 
@@ -169,7 +169,7 @@ github__workflow_last_completed_run() {
 ################################################################################
 github__run_has_failed_job() {
   local failed
-  failed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$1/jobs" --jq '.jobs[]' \
-    | jq -r --arg p "$2" 'select((.name | startswith($p)) and .conclusion == "failure") | .id')
-  [[ -n $failed ]]
+  failed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/$1/jobs" --jq '.jobs[]' \
+    | jq -r --arg p "$2" 'select((.name | startswith($p)) and .conclusion == "failure") | .id')"
+  [[ -n "${failed}" ]]
 }

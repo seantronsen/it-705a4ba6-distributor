@@ -4,7 +4,7 @@
 #
 # Each script lists the environment it needs in its header and checks it with base__env_require.
 
-[[ -n ${_LIB_BASE_SH:-} ]] && return 0
+[[ -n "${_LIB_BASE_SH:-}" ]] && return 0
 _LIB_BASE_SH=1
 
 set -euo pipefail
@@ -14,11 +14,11 @@ shopt -s inherit_errexit
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck disable=SC2034 # used by the scripts that source this
 {
-  CONFIG=$ROOT/config/distributor.yaml
-  STATE=$ROOT/state/state.json
+  CONFIG="${ROOT}/config/distributor.yaml"
+  STATE="${ROOT}/state/state.json"
   SUITE=stable
   # github-actions' trust-chain check, pinned by commit; Renovate updates the tag and commit.
   # renovate: datasource=github-tags depName=OpenCHAMI/github-actions currentValue=v4.0.0
@@ -37,7 +37,7 @@ base__timestamp_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # Arguments:
 #   jq's arguments.
 ################################################################################
-base__jq() { jq -L "$ROOT/scripts/jq" "$@"; }
+base__jq() { jq -L "${ROOT}/scripts/jq" "$@"; }
 
 ################################################################################
 # Percent-encodes a string for a URL.
@@ -58,7 +58,7 @@ base__uri_encode() {
 base__env_require() {
   local name missing=()
   for name in "$@"; do
-    [[ -n ${!name:-} ]] || missing+=("$name")
+    [[ -n "${!name:-}" ]] || missing+=("${name}")
   done
   ((${#missing[@]} == 0)) || log__fatal "missing environment: ${missing[*]}"
 }

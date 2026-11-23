@@ -22,18 +22,18 @@ source "$(dirname "$0")/lib/state.sh"
 ################################################################################
 apply_deltas_to_state() {
   local state f releases=() patches=()
-  state=$(state__json)
+  state="$(state__json)"
   for f in "$@"; do
-    if jq -e .key "$f" > /dev/null; then releases+=("$f"); else patches+=("$f"); fi
+    if jq -e .key "${f}" > /dev/null; then releases+=("${f}"); else patches+=("${f}"); fi
   done
   for f in "${releases[@]}" "${patches[@]}"; do
-    state=$(base__jq -c --slurpfile d "$f" \
-      'import "state" as state; state::apply_delta($d[0])' <<< "$state")
+    state="$(base__jq -c --slurpfile d "${f}" \
+      'import "state" as state; state::apply_delta($d[0])' <<< "${state}")"
   done
 
-  jq -S . <<< "$state" > "$STATE.tmp"
-  mv "$STATE.tmp" "$STATE"
-  log__info "record: updated $STATE"
+  jq -S . <<< "${state}" > "${STATE}.tmp"
+  mv "${STATE}.tmp" "${STATE}"
+  log__info "record: updated ${STATE}"
 }
 
 ################################################################################
@@ -44,16 +44,16 @@ apply_deltas_to_state() {
 #   The body on stdout.
 ################################################################################
 rejection_issue_body() {
-  local result=$1 key reasons run
-  key=$(jq -r .key "$result")
-  reasons=$(jq -r '.reasons | map("- \(.)") | join("\n")' "$result")
-  run=$(jq -r .run "$result")
+  local result="$1" key reasons run
+  key="$(jq -r .key "${result}")"
+  reasons="$(jq -r '.reasons | map("- \(.)") | join("\n")' "${result}")"
+  run="$(jq -r .run "${result}")"
   cat << EOF
-Release \`$key\` was rejected, so none of its packages were published.
+Release \`${key}\` was rejected, so none of its packages were published.
 
-$reasons
+${reasons}
 
-Run: $run
+Run: ${run}
 
 Fix the problem and publish a new patch release; this release won't be processed again.
 EOF
@@ -68,11 +68,11 @@ EOF
 ################################################################################
 denial_issue_body() {
   local packages
-  packages=$(jq -r 'map("- `\(.filename)` (\(.release))") | join("\n")' <<< "$1")
+  packages="$(jq -r 'map("- `\(.filename)` (\(.release))") | join("\n")' <<< "$1")"
   cat << EOF
 These packages were admitted with a denied repo key and have been unpublished:
 
-$packages
+${packages}
 EOF
 }
 
@@ -85,14 +85,14 @@ EOF
 open_issues() {
   local f group key
   for f in "$@"; do
-    jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
-    github__issue_ensure_open "Rejected release: $(jq -r .key "$f")" rejected-release \
-      "$(rejection_issue_body "$f")"
+    jq -e '.key and .status == "rejected"' "${f}" > /dev/null || continue
+    github__issue_ensure_open "Rejected release: $(jq -r .key "${f}")" rejected-release \
+      "$(rejection_issue_body "${f}")"
   done
   while IFS= read -r group; do
-    key=$(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group")
-    github__issue_create "Denied repo key: $key ($(date -u +%F))" denied-repo-key \
-      "$(denial_issue_body "$group")"
+    key="$(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "${group}")"
+    github__issue_create "Denied repo key: ${key} ($(date -u +%F))" denied-repo-key \
+      "$(denial_issue_body "${group}")"
   # The denied packages across the delta files, one group per repo and key.
   done < <(jq -c -s '[.[].denied // [] | .[]] | group_by([.repo, .fingerprint])[]' "$@")
 }
@@ -103,17 +103,17 @@ open_issues() {
 #   <state|issues|all> <result.json|delta.json>...
 ################################################################################
 main() {
-  local mode=$1
+  local mode="$1"
   shift
-  if [[ $mode == state || $mode == all ]]; then apply_deltas_to_state "$@"; fi
-  if [[ $mode == issues || $mode == all ]]; then
+  if [[ "${mode}" == state || "${mode}" == all ]]; then apply_deltas_to_state "$@"; fi
+  if [[ "${mode}" == issues || "${mode}" == all ]]; then
     base__env_require GITHUB_TOKEN GITHUB_REPOSITORY
     open_issues "$@"
   fi
 }
 
-[[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
-case $1 in
+[[ "$#" -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
+case "$1" in
   state | issues | all) ;;
   *) log__fatal "unknown mode: $1 (state, issues, or all)" ;;
 esac

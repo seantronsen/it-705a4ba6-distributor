@@ -11,11 +11,11 @@ source "$(dirname "$0")/lib/base.sh"
 #   <schema> <file>...
 ################################################################################
 main() {
-  local schema=$1
+  local schema="$1"
   shift
-  exec pipx run --spec "$(grep '^check-jsonschema==' "$ROOT/schemas/requirements.txt")" \
-    check-jsonschema --schemafile "$schema" "$@"
+  exec pipx run --spec "$(grep '^check-jsonschema==' "${ROOT}/schemas/requirements.txt")" \
+    check-jsonschema --schemafile "${schema}" "$@"
 }
 
-[[ $# -ge 2 ]] || log__fatal "usage: validate.sh <schema> <file>..."
+[[ "$#" -ge 2 ]] || log__fatal "usage: validate.sh <schema> <file>..."
 main "$@"

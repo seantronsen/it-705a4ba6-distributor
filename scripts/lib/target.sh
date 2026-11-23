@@ -2,7 +2,7 @@
 # The publish target: the config's `target.s3` bucket. Paths are keys relative to the bucket's
 # root (e.g. rpm/packages/<file>).
 
-[[ -n ${_LIB_TARGET_SH:-} ]] && return 0
+[[ -n "${_LIB_TARGET_SH:-}" ]] && return 0
 _LIB_TARGET_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
@@ -39,7 +39,7 @@ target__aws() {
 #   The header value on stdout.
 ################################################################################
 target__cache_control() {
-  case $1 in
+  case "$1" in
     rpm/packages/* | deb/pool/*) echo 'public,max-age=31536000,immutable' ;;
     *) echo "public,max-age=$(config__get .target.s3.metadata_max_age),must-revalidate" ;;
   esac
@@ -57,10 +57,10 @@ target__cache_control() {
 target__file_get() {
   local err
   mkdir -p "$(dirname "$2")"
-  if ! err=$(target__aws s3api get-object --bucket "$(config__get .target.s3.bucket)" \
-    --key "$1" "$2" 2>&1 > /dev/null); then
-    [[ $err == *NoSuchKey* ]] && return 1
-    log__fatal "can't read $(target__url)/$1: $err"
+  if ! err="$(target__aws s3api get-object --bucket "$(config__get .target.s3.bucket)" \
+    --key "$1" "$2" 2>&1 > /dev/null)"; then
+    [[ "${err}" == *NoSuchKey* ]] && return 1
+    log__fatal "can't read $(target__url)/$1: ${err}"
   fi
 }
 

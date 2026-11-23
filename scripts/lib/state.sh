@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The state: state/state.json, checked against schemas/state.schema.json.
 
-[[ -n ${_LIB_STATE_SH:-} ]] && return 0
+[[ -n "${_LIB_STATE_SH:-}" ]] && return 0
 _LIB_STATE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
@@ -12,5 +12,5 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 #   The JSON on stdout.
 ################################################################################
 state__json() {
-  cat "$STATE"
+  cat "${STATE}"
 }
