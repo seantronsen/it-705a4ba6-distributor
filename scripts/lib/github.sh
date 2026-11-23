@@ -143,3 +143,33 @@ github__issue_create() {
   gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f title="$1" -f body="$3" -f "labels[]=$2" \
     > /dev/null
 }
+
+################################################################################
+# A workflow's latest completed run in this repo.
+# Globals:
+#   GITHUB_REPOSITORY
+# Arguments:
+#   <workflow file, e.g. poll.yml>
+# Outputs:
+#   The run's ID on stdout, or nothing when it has none.
+################################################################################
+github__workflow_last_completed_run() {
+  gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$1/runs" \
+    -X GET -f status=completed -f per_page=1 --jq '.workflow_runs[0].id // empty'
+}
+
+################################################################################
+# Whether a job whose name starts with a prefix failed in a run of this repo.
+# Globals:
+#   GITHUB_REPOSITORY
+# Arguments:
+#   <run ID> <job name prefix, e.g. "prune / ">
+# Returns:
+#   0 when one did, 1 otherwise.
+################################################################################
+github__run_has_failed_job() {
+  local failed
+  failed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$1/jobs" --jq '.jobs[]' \
+    | jq -r --arg p "$2" 'select((.name | startswith($p)) and .conclusion == "failure") | .id')
+  [[ -n $failed ]]
+}

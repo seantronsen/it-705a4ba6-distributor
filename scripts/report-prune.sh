@@ -15,21 +15,17 @@ LABEL=prune-failing
 ################################################################################
 # Whether a prune job failed in the calling workflow's previous completed run.
 # Globals:
-#   GITHUB_WORKFLOW_REF, GITHUB_REPOSITORY
+#   GITHUB_WORKFLOW_REF
 # Returns:
 #   0 when one did, 1 otherwise.
 ################################################################################
 has_prune_failed_before() {
-  local workflow previous failed
+  local workflow previous
   # The calling workflow's file (e.g. poll.yml), from owner/repo/<path>@<ref>.
   workflow=${GITHUB_WORKFLOW_REF%@*}
   workflow=${workflow##*/}
-  previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
-    -X GET -f status=completed -f per_page=1 --jq '.workflow_runs[0].id // empty')
-  [[ -n $previous ]] || return 1
-  failed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$previous/jobs" \
-    --jq '.jobs[] | select((.name | startswith("prune / ")) and .conclusion == "failure") | .id')
-  [[ -n $failed ]]
+  previous=$(github__workflow_last_completed_run "$workflow")
+  [[ -n $previous ]] && github__run_has_failed_job "$previous" "prune / "
 }
 
 ################################################################################
