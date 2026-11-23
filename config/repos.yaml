@@ -95,9 +95,7 @@ publishers:
 # Removing an entry stops polling that repo; its published packages stay, under
 # the default retention below.
 #
-# Each entry:
-#
-#   name: owner/repo on GitHub (required).
+# Keyed by owner/repo on GitHub. Under each (all optional; `{}` for none):
 #
 #   allow: extra package names this repo may publish (optional). By default a
 #          repo may publish only packages named `<repo>` or `<repo>-*` (its
@@ -108,7 +106,7 @@ publishers:
 #          both `smd` and `smd-tools` are configured) is the longer one's.
 #
 #   deny: revoked repo keys (optional). Each entry:
-#     fingerprint: the repo key's fingerprint (required; quote it).
+#     fingerprint: the repo key's fingerprint (required; uppercase, quoted).
 #     since:       UTC timestamp, exactly YYYY-MM-DDTHH:MM:SSZ (optional;
 #                  quote it). Only packages admitted at or after it are
 #                  pruned. Without it, every package admitted with this key
@@ -136,17 +134,18 @@ publishers:
 # Example:
 #
 #   repos:
-#     - name: OpenCHAMI/smd
+#     OpenCHAMI/smd:
 #       keep-releases: ["1.4"]
 #       retain:
 #         - {package: smd, version: "2.19.4", reason: pinned by a live deployment}
-#     - name: OpenCHAMI/release
+#     OpenCHAMI/release:
 #       allow: [openchami]
-#     - name: OpenCHAMI/tokensmith
+#     OpenCHAMI/tokensmith:
 #       deny:
 #         - fingerprint: "0000000000000000000000000000000000000000"
 #           since: "2026-01-01T00:00:00Z"
 #           reason: leaked and rotated
+#     OpenCHAMI/magellan: {}
 repos:
-  - name: OpenCHAMI/github-actions-testbed
+  OpenCHAMI/github-actions-testbed:
     allow: [testbed, testbed-quadlet]

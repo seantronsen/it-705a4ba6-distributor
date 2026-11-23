@@ -5,9 +5,6 @@ def semver: split(".") | map(tonumber);
 
 def repo_of: split("@")[0];
 
-# Config entries keyed by repo name.
-def by_name: map({key: .name, value: .}) | from_entries;
-
 # Whether GitHub user $id may publish $repo's releases ($pubs: the config's publishers, keyed by
 # user ID; a username can be renamed and then registered by someone else, an ID can't). No entry:
 # no. An entry without `repos` (core maintainers): any repo. With `repos`: only those.
@@ -27,32 +24,30 @@ def published_packages:
 # Published packages admitted with a denied repo key (all, or admitted at or after `since`),
 # from state (input): [{release, repo, format, name, filename, fingerprint}]
 def denied_packages($cfg):
-  [($cfg | by_name) as $c
-    | published_packages[]
+  [published_packages[]
     | . as $p
-    | (($c[$p.repo].deny // [])[]
-        | select((.fingerprint | ascii_upcase) == ($p.repo_key // "" | ascii_upcase))
+    | (($cfg[$p.repo].deny // [])[]
+        | select(.fingerprint == $p.repo_key)
         | select(.since == null or (($p.at | fromdateiso8601) >= (.since | fromdateiso8601))))
     | {release: $p.release, repo: $p.repo, format: $p.format, name: $p.name,
-       filename: $p.filename, fingerprint: (.fingerprint | ascii_upcase)}];
+       filename: $p.filename, fingerprint}];
 
 # Retention over candidate packages (input: [{repo, name, arch, version, ...}]); adds
 # `keep: true|false` to each. Per (name, arch): majors N and N-1 keep the latest patch of each
 # minor, older majors go; `retain` versions and `keep-releases` lines are always kept.
 def retention($cfg):
-  ($cfg | by_name) as $c
-  | group_by([.name, .arch])
+  group_by([.name, .arch])
   | map(
       map(. + {v: (.version | semver)})
       | (map(.v[0]) | max) as $n
       | group_by(.v[0:2])
       | map((map(.v[2]) | max) as $latest | map(. + {latest: (.v[2] == $latest)}))
       | add
-      | map(. as $p | ($c[$p.repo] // {}) as $rc
+      | map(. as $p | ($cfg[$p.repo] // {}) as $rc
           | . + {keep: (
               ($p.latest and $p.v[0] >= $n - 1)
-              or (($rc.retain // []) | any(.package == $p.name and (.version | tostring) == $p.version))
-              or ($p.latest and (($rc["keep-releases"] // []) | any(tostring == "\($p.v[0]).\($p.v[1])")))
+              or (($rc.retain // []) | any(.package == $p.name and .version == $p.version))
+              or ($p.latest and (($rc["keep-releases"] // []) | any(. == "\($p.v[0]).\($p.v[1])")))
             )})
       | map(del(.v, .latest)))
   | add // [];

@@ -60,18 +60,18 @@
       }
     },
     "repos": {
-      "type": "array",
-      "items": {
+      "description": "Keyed by owner/repo on GitHub.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/repoName" },
+      "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name"],
         "properties": {
-          "name": { "$ref": "#/$defs/repoName" },
           "allow": {
             "description": "Extra package names beyond <repo> and <repo>-*.",
             "type": "array",
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.+_-]*$" }
+            "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$" }
           },
           "deny": {
             "description": "Revoked repo keys.",
@@ -82,9 +82,9 @@
               "required": ["fingerprint"],
               "properties": {
                 "fingerprint": {
-                  "description": "The repo key's fingerprint, quoted.",
+                  "description": "The repo key's fingerprint, uppercase and quoted.",
                   "type": "string",
-                  "pattern": "^[0-9A-Fa-f]{40}$"
+                  "pattern": "^[0-9A-F]{40}$"
                 },
                 "since": {
                   "description": "UTC timestamp, YYYY-MM-DDTHH:MM:SSZ (what jq's fromdateiso8601 parses), quoted: prune only what was admitted from then on.",

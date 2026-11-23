@@ -93,7 +93,7 @@ check_packages() {
   local repo_key reasons=() denied
   repo_key=$(jq -r .repo_key "$result")
   denied=$(jq -r --arg repo "$repo" --arg f "$repo_key" \
-    '.[] | select(.name == $repo) | (.deny // [])[] | select((.fingerprint | ascii_upcase) == $f) | .reason // "no reason given"' \
+    '(.[$repo].deny // [])[] | select(.fingerprint == $f) | .reason // "no reason given"' \
     <<< "$cfg" | head -1)
   [[ -z $denied ]] || finish rejected "repo key $repo_key is denied: $denied"
 
@@ -149,8 +149,8 @@ check_packages() {
     . as $state
     | $infos
     | ($repo | short(.)) as $me
-    | ($cfg | map(select(.name == $repo))[0].allow // []) as $allow
-    | [$cfg[] | select(.name != $repo)] as $others
+    | ($cfg[$repo].allow // []) as $allow
+    | [$cfg | to_entries[] | select(.key != $repo) | {name: .key} + .value] as $others
     # Historical owners: the repo that first published each name, from state.
     | ([$state | to_entries[] | .key as $k | (.value.packages // [])[] | {name, repo: ($k | repo_of)}]
        | group_by(.name) | map({key: .[0].name, value: (map(.repo) | unique)}) | from_entries) as $owners

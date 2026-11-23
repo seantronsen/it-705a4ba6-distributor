@@ -17,7 +17,7 @@ while IFS= read -r repo; do
     | $rel[] | select((.draft or .prerelease) | not)
     | {repo: $repo, tag: .tag_name, published_at}
     | select($state["\(.repo)@\(.tag)"] == null)' >> "$new"
-done < <(jq -r '.[].name' <<< "$cfg")
+done < <(jq -r 'keys[]' <<< "$cfg")
 
 log "discover: $(wc -l < "$new") new release(s), admitting at most $MAX_RELEASES"
 jq -s -c --argjson max "$MAX_RELEASES" 'sort_by(.published_at) | .[:$max] | map({repo, tag})' "$new"

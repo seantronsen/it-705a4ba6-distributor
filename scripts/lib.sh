@@ -4,7 +4,7 @@
 # Environment (all optional unless a script says otherwise):
 #   CONFIG                 config file (default config/repos.yaml)
 #   STATE                  state file (default state/state.json)
-#   GITHUB_TOKEN           token for the GitHub API (releases, assets, issues)
+#   GITHUB_TOKEN           gh's token for the GitHub API (releases, assets, runs, issues)
 #   PUBLISH_DIR            local publish target, used when the config sets no `target`
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   credentials for the config's `target.s3`
 #   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (default, local target only:
@@ -38,8 +38,8 @@ run_url() { echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN
 # jq with scripts/lib.jq available through `include "lib";`.
 jql() { jq -L "$ROOT/scripts" "$@"; }
 
-# The repos list from the config, as JSON.
-config_json() { yq -o=json -I=0 '.repos // []' "$CONFIG"; }
+# The config's repos, keyed by repo name, as JSON.
+config_json() { yq -o=json -I=0 '.repos // {}' "$CONFIG"; }
 
 # The config's publishers, keyed by GitHub user ID, as JSON.
 publishers_json() { yq -o=json -I=0 '.publishers // {}' "$CONFIG"; }
