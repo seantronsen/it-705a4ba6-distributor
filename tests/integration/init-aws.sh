@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates the S3 suite's AWS resources and records them for s3/run.sh and s3/destroy-aws.sh: the
+# Creates the test bucket's AWS resources and records them for the suites and destroy-aws.sh: the
 # bucket in ~/.local/state/distributor-it/s3.json (IT_S3_STATE overrides), the access key in
 # s3-credentials.json beside it (mode 600; IT_S3_CREDENTIALS overrides):
 #
@@ -8,7 +8,7 @@
 #   IAM user distributor-it-<random>  may only list the bucket and read, write, and delete in
 #                                     it; one access key
 #
-#   s3/init-aws.sh [region]               default: AWS_REGION, else us-east-1
+#   init-aws.sh [region]               default: AWS_REGION, else us-east-1
 #
 # Uses your AWS CLI credentials (an admin; AWS_PROFILE picks a profile). Nothing caps the
 # bucket's size; the expiry and the suite's prune keep it small. Refused when either file
@@ -17,12 +17,12 @@ set -uo pipefail
 # The AWS CLI pages any output on a terminal; nothing here needs it.
 export AWS_PAGER=""
 
-# shellcheck source=../lib/log.sh
-source "$(dirname "$0")/../lib/log.sh"
-# shellcheck source=../lib/random.sh
-source "$(dirname "$0")/../lib/random.sh"
-# shellcheck source=../lib/config.sh
-source "$(dirname "$0")/../lib/config.sh"
+# shellcheck source=lib/log.sh
+source "$(dirname "$0")/lib/log.sh"
+# shellcheck source=lib/random.sh
+source "$(dirname "$0")/lib/random.sh"
+# shellcheck source=lib/config.sh
+source "$(dirname "$0")/lib/config.sh"
 
 ################################################################################
 # The bucket policy: anyone may read objects (the distros install anonymously); listing isn't
@@ -121,7 +121,7 @@ main() {
   file=$(config__file_state_s3_bucket)
   if [[ -e $file || -e $(config__file_state_s3_credentials) ]]; then
     log__fatal "already initialized: $file or $(config__file_state_s3_credentials) exists;" \
-      "s3/destroy-aws.sh deletes what they list"
+      "destroy-aws.sh deletes what they list"
   fi
   if ! aws sts get-caller-identity > /dev/null 2>&1; then
     log__fatal "the AWS CLI has no working credentials (aws configure, or set AWS_PROFILE)"
@@ -135,13 +135,13 @@ main() {
     log__fatal "can't write $file"
   fi
   s3_init__bucket "$name" "$region" ||
-    log__fatal "the bucket $name wasn't set up; s3/destroy-aws.sh deletes what was created"
+    log__fatal "the bucket $name wasn't set up; destroy-aws.sh deletes what was created"
   log__info "created the bucket $name ($region)"
   s3_init__user "$name" ||
-    log__fatal "the user $name wasn't set up; s3/destroy-aws.sh deletes what was created"
+    log__fatal "the user $name wasn't set up; destroy-aws.sh deletes what was created"
   log__info "created the IAM user $name and its access key"
-  log__info "recorded in $file and $(config__file_state_s3_credentials); s3/run.sh uses them (new" \
-    "access keys can take a minute to work)"
+  log__info "recorded in $file and $(config__file_state_s3_credentials); the suites use them" \
+    "(new access keys can take a minute to work)"
 }
 
 main "$@"

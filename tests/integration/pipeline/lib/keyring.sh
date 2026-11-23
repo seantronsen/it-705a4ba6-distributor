@@ -36,7 +36,7 @@ keyring__deb_fprs() {
 }
 
 ################################################################################
-# Whether the rpm installs /etc/pki/rpm-gpg/RPM-GPG-KEY-openchami (s3/cases/install.bats checks
+# Whether the rpm installs /etc/pki/rpm-gpg/RPM-GPG-KEY-openchami (clients/cases/install.bats checks
 # its content).
 # Arguments:
 #   The rpm.

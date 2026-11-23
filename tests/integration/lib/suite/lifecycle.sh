@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The CI tests' lifecycle on the throwaway repos: preparing them once per run, resetting them to
+# The suites' lifecycle on the throwaway repos: preparing them once per run, resetting them to
 # a clean baseline before every test, and cleaning them at the end of the run.
 
 [[ -n ${_IT_LIFECYCLE_SH:-} ]] && return 0

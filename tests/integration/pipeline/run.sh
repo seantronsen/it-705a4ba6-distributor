@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Runs the distributor's CI integration tests (ci/cases/*.bats) against the throwaway repos.
+# Runs the pipeline tests (pipeline/cases/*.bats) against the throwaway repos and the test bucket.
 #
-#   ci/run.sh                        every test
-#   ci/run.sh retention noop         these tests (file names, .bats optional)
-#   ci/run.sh --filter 'deny'        bats options pass through
+#   pipeline/run.sh                  every test
+#   pipeline/run.sh retention noop   these tests (file names, .bats optional)
+#   pipeline/run.sh --filter 'deny'  bats options pass through
 #
-# Every test publishes to the test bucket: from s3/init-aws.sh (run it once), or s3.bucket,
+# Every test publishes to the test bucket: from init-aws.sh (run it once), or s3.bucket,
 # .region, and .url in your config with credentials scoped to the bucket in AWS_ACCESS_KEY_ID and
 # AWS_SECRET_ACCESS_KEY. They're set as the distributor's secrets from the host; the container
 # never sees them. The bucket's contents are overwritten.
@@ -27,7 +27,7 @@ main() {
       return 0
       ;;
   esac
-  launch__run ci "$@"
+  launch__run pipeline "$@"
 }
 
 main "$@"

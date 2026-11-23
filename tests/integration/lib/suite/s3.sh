@@ -4,9 +4,9 @@
 [[ -n ${_IT_S3_SH:-} ]] && return 0
 _IT_S3_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/settings.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/suite/state.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../settings.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 
 ################################################################################
 # An object's URL.

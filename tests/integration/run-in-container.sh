@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside the tools container that ci/run.sh or s3/run.sh starts; never run it by hand.
+# Runs inside the tools container that pipeline/run.sh or clients/run.sh starts; never run it by hand.
 # Installs the tools, sets up GitHub access, and runs bats on one suite's tests.
 #
 #   run-in-container.sh <suite> [test name... | bats option...]

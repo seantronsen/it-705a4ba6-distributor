@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deletes the AWS resources s3/init-aws.sh recorded in the state file, after you confirm their
+# Deletes the AWS resources init-aws.sh recorded in the state file, after you confirm their
 # names: the bucket with every object in it, and the IAM user (named like the bucket) with its
 # policy and access keys; then deletes the state and credentials files. Uses your AWS CLI
 # credentials (an admin; AWS_PROFILE picks one).
@@ -7,10 +7,10 @@ set -uo pipefail
 # The AWS CLI pages any output on a terminal; nothing here needs it.
 export AWS_PAGER=""
 
-# shellcheck source=../lib/log.sh
-source "$(dirname "$0")/../lib/log.sh"
-# shellcheck source=../lib/config.sh
-source "$(dirname "$0")/../lib/config.sh"
+# shellcheck source=lib/log.sh
+source "$(dirname "$0")/lib/log.sh"
+# shellcheck source=lib/config.sh
+source "$(dirname "$0")/lib/config.sh"
 
 ################################################################################
 # Deletes the bucket and every object in it.
@@ -55,14 +55,14 @@ s3_destroy__user() {
 main() {
   local file name region answer failed=false
   file=$(config__file_state_s3_bucket)
-  [[ -f $file ]] || log__fatal "$file not found: s3/init-aws.sh created nothing to destroy"
+  [[ -f $file ]] || log__fatal "$file not found: init-aws.sh created nothing to destroy"
   if ! name=$(jq -r '.bucket // empty' "$file") ||
     ! region=$(jq -r '.region // empty' "$file"); then
     log__fatal "can't read $file"
   fi
   # Only what init-aws.sh creates: the bucket and the user share its name.
   if [[ ! $name =~ ^distributor-it-[0-9a-f]{8}$ ]]; then
-    log__fatal "refusing: $file lists resources s3/init-aws.sh doesn't create"
+    log__fatal "refusing: $file lists resources init-aws.sh doesn't create"
   fi
   if ! aws sts get-caller-identity > /dev/null 2>&1; then
     log__fatal "the AWS CLI has no working credentials (aws configure, or set AWS_PROFILE)"
@@ -76,7 +76,7 @@ main() {
   s3_destroy__user "$name" || failed=true
 
   # Kept until everything is gone, so a rerun finishes the job.
-  $failed && log__fatal "not everything was deleted; rerun s3/destroy-aws.sh"
+  $failed && log__fatal "not everything was deleted; rerun destroy-aws.sh"
   rm -f "$file" "$(config__file_state_s3_credentials)"
   log__info "removed $file and $(config__file_state_s3_credentials)"
 }

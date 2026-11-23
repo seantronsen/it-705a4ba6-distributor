@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # The suites' configuration on the host: config.defaults.yaml overridden by the user's config
-# file, plus the state files init.sh and s3/init-aws.sh write.
+# file, plus the state files init.sh and init-aws.sh write.
 
 [[ -n ${_IT_CONFIG_SH:-} ]] && return 0
 _IT_CONFIG_SH=1
@@ -39,7 +39,7 @@ config__file_state_repos() {
 }
 
 ################################################################################
-# The S3 bucket state file: the bucket s3/init-aws.sh created, kept outside the source tree.
+# The S3 bucket state file: the bucket init-aws.sh created, kept outside the source tree.
 # Globals:
 #   IT_S3_STATE (optional override), XDG_STATE_HOME
 # Outputs:
@@ -50,7 +50,7 @@ config__file_state_s3_bucket() {
 }
 
 ################################################################################
-# The S3 credentials state file: the access key of the IAM user s3/init-aws.sh created. Never
+# The S3 credentials state file: the access key of the IAM user init-aws.sh created. Never
 # merged into the configuration (which the run writes out); mode 600.
 # Globals:
 #   IT_S3_CREDENTIALS (optional override), XDG_STATE_HOME

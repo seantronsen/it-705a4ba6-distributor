@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The host side of a run, shared by ci/run.sh and s3/run.sh: checks the host and the
+# The host side of a run, shared by pipeline/run.sh and clients/run.sh: checks the host and the
 # configuration, sets the test bucket's credentials as the distributor's secrets, snapshots the
 # code under test, and runs one suite in a transient tools container, which gets the resolved
 # settings as a file and the GitHub token on stdin.
@@ -280,7 +280,7 @@ launch__cleanup() {
 }
 
 ################################################################################
-# One of the test bucket's credentials: from the credentials file s3/init-aws.sh writes when
+# One of the test bucket's credentials: from the credentials file init-aws.sh writes when
 # there is one, else the environment.
 # Arguments:
 #   Variable name (AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY).
@@ -310,7 +310,7 @@ launch__check_s3() {
   done
   for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
     if [[ -z $(launch__s3_credential "$name") ]]; then
-      log__error "needs $name (the test bucket's credentials): run s3/init-aws.sh"
+      log__error "needs $name (the test bucket's credentials): run init-aws.sh"
       failed=true
     fi
   done

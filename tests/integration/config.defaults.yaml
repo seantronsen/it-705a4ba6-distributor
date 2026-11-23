@@ -101,12 +101,12 @@ containers:
     # Default: docker.io/library/debian:13
     tools: docker.io/library/debian:13
 
-    # s3/cases/install.bats: the Fedora client (dnf installs).
+    # clients/cases/install.bats: the Fedora client (dnf installs).
     #
     # Default: docker.io/library/fedora:42
     fedora: docker.io/library/fedora:42
 
-    # s3/cases/install.bats: the Debian client (apt installs).
+    # clients/cases/install.bats: the Debian client (apt installs).
     #
     # Default: docker.io/library/debian:13
     debian: docker.io/library/debian:13
@@ -163,8 +163,8 @@ s3:
   # distributor's config).
   #
   # Its name, region, and public base URL. Normally left unset:
-  # s3/init-aws.sh creates one and records it in its state file
-  # (~/.local/state/distributor-it/s3.json), and s3/destroy-aws.sh deletes it.
+  # init-aws.sh creates one and records it in its state file
+  # (~/.local/state/distributor-it/s3.json), and destroy-aws.sh deletes it.
   # Set here, they're used instead (with credentials in AWS_ACCESS_KEY_ID and
   # AWS_SECRET_ACCESS_KEY).
   #
