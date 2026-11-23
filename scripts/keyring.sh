@@ -28,17 +28,19 @@ next_version() {
 ################################################################################
 # Exports every key to package (keys/, or the archive public key without keys/archive.asc)
 # into one armored file.
+# Globals:
+#   ARCHIVE_PUB (keys__init_archive)
 # Arguments:
 #   <dest>
 ################################################################################
 export_keys() {
-  local home keys=("$ROOT"/keys/*.asc) k
+  local dest=$1 home keys=("$ROOT"/keys/*.asc) k
   [[ -f $ROOT/keys/archive.asc ]] || keys=("$ARCHIVE_PUB")
   home=$(mktemp -d)
   chmod 700 "$home"
   for k in "${keys[@]}"; do gpg --homedir "$home" --batch --quiet --import "$k" 2> /dev/null; done
-  gpg --homedir "$home" --batch --armor --export > "$1"
-  [[ -s $1 ]] || log__fatal "no keys to package"
+  gpg --homedir "$home" --batch --armor --export > "$dest"
+  [[ -s $dest ]] || log__fatal "no keys to package"
 }
 
 ################################################################################
@@ -47,27 +49,37 @@ export_keys() {
 #   <version> <files dir> <dest>
 ################################################################################
 write_result() {
-  local f pkgs='[]'
-  for f in "$2"/*; do
+  local version=$1 files=$2 dest=$3 f pkgs='[]'
+  for f in "$files"/*; do
     pkgs=$(jq -c --argjson i "$(package__info "$f")" --arg sha "$(sha256sum "$f" | cut -d' ' -f1)" \
       '. + [$i + {sha256: $sha, path: "files/\($i.filename)", status: "published"}]' <<< "$pkgs")
   done
-  jq -n --arg repo "$KEYRING" --arg v "$1" --arg at "$(base__now)" --arg run "$(github__run_url)" \
-    --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo, tag: $v, status: "published",
-      at: $at, run: $run, repo_key: null, reasons: [], packages: $p}' > "$3"
+  jq -n --arg repo "$KEYRING" --arg v "$version" --arg at "$(base__now)" \
+    --arg run "$(github__run_url)" --argjson p "$pkgs" '{key: "\($repo)@\($v)", repo: $repo,
+      tag: $v, status: "published", at: $at, run: $run, repo_key: null, reasons: [],
+      packages: $p}' > "$dest"
+}
+
+################################################################################
+# Builds the keyring at its next version into the admit dir.
+# Arguments:
+#   <outdir>
+################################################################################
+main() {
+  local out version fmt
+  mkdir -p "$1/files"
+  out=$(cd "$1" && pwd)
+  keys__init_archive
+  version=$(next_version)
+  mkdir -p "$ROOT/keyring/build"
+  export_keys "$ROOT/keyring/build/keys.asc"
+  for fmt in rpm deb; do
+    (cd "$ROOT" && KEYRING_VERSION=$version nfpm package -f keyring/nfpm.yaml -p "$fmt" \
+      -t "$out/files/" > /dev/null) || log__fatal "nfpm failed to build the $fmt keyring"
+  done
+  write_result "$version" "$out/files" "$out/result.json"
+  log__info "keyring: built $KEYRING@$version"
 }
 
 [[ $# -eq 1 ]] || log__fatal "usage: keyring.sh <outdir>"
-mkdir -p "$1/files"
-out=$(cd "$1" && pwd)
-
-keys__init_archive
-version=$(next_version)
-mkdir -p "$ROOT/keyring/build"
-export_keys "$ROOT/keyring/build/keys.asc"
-for fmt in rpm deb; do
-  (cd "$ROOT" && KEYRING_VERSION=$version nfpm package -f keyring/nfpm.yaml -p "$fmt" \
-    -t "$out/files/" > /dev/null) || log__fatal "nfpm failed to build the $fmt keyring"
-done
-write_result "$version" "$out/files" "$out/result.json"
-log__info "keyring: built $KEYRING@$version"
+main "$@"

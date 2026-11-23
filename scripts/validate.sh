@@ -5,7 +5,17 @@
 #   validate.sh <schema> <file>...
 source "$(dirname "$0")/lib/base.sh"
 
-[[ $# -ge 2 ]] || log__fatal "usage: validate.sh <schema> <file>..."
+################################################################################
+# Validates the files with the pinned check-jsonschema.
+# Arguments:
+#   <schema> <file>...
+################################################################################
+main() {
+  local schema=$1
+  shift
+  exec pipx run --spec "$(grep '^check-jsonschema==' "$ROOT/config/requirements.txt")" \
+    check-jsonschema --schemafile "$schema" "$@"
+}
 
-exec pipx run --spec "$(grep '^check-jsonschema==' "$ROOT/config/requirements.txt")" \
-  check-jsonschema --schemafile "$1" "${@:2}"
+[[ $# -ge 2 ]] || log__fatal "usage: validate.sh <schema> <file>..."
+main "$@"

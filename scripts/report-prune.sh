@@ -9,7 +9,6 @@
 # GITHUB_* variables, and GITHUB_TOKEN.
 source "$(dirname "$0")/lib/github.sh"
 
-[[ $# -eq 1 && ($1 == true || $1 == false) ]] || log__fatal "usage: report-prune.sh <true|false>"
 TITLE='Prune failing'
 LABEL=prune-failing
 
@@ -33,14 +32,28 @@ has_failed_before() {
   [[ -n $failed ]]
 }
 
-if [[ $1 == false ]]; then
-  github__close_issue "$TITLE" "$LABEL" "Prune succeeded again ([run]($(github__run_url)))."
-  exit 0
-fi
-if ! has_failed_before; then
-  echo "::warning::Prune failed; the next run retries it."
-  exit 0
-fi
-github__ensure_issue "$TITLE" "$LABEL" \
-  "Prune failed in two runs in a row. Latest: $(github__run_url)"
-exit 1
+################################################################################
+# Closes the issue when prune succeeded; when it failed, warns, or opens the issue and fails if
+# it failed in the previous run too.
+# Arguments:
+#   <failed: true|false>
+# Returns:
+#   1 when prune failed twice in a row.
+################################################################################
+main() {
+  local failed=$1
+  if [[ $failed == false ]]; then
+    github__close_issue "$TITLE" "$LABEL" "Prune succeeded again ([run]($(github__run_url)))."
+    return
+  fi
+  if ! has_failed_before; then
+    echo "::warning::Prune failed; the next run retries it."
+    return
+  fi
+  github__ensure_issue "$TITLE" "$LABEL" \
+    "Prune failed in two runs in a row. Latest: $(github__run_url)"
+  return 1
+}
+
+[[ $# -eq 1 && ($1 == true || $1 == false) ]] || log__fatal "usage: report-prune.sh <true|false>"
+main "$@"

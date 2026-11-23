@@ -47,7 +47,7 @@ github__releases() {
 # Outputs:
 #   A JSON array of {name, id} on stdout.
 ################################################################################
-github__assets() {
+github__release_assets() {
   gh api "repos/$1/releases/tags/$(github__uri "$2")" | jq -c '[.assets[] | {name, id}]'
 }
 

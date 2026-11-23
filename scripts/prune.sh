@@ -16,69 +16,72 @@ source "$(dirname "$0")/lib/repo.sh"
 source "$(dirname "$0")/lib/state.sh"
 source "$(dirname "$0")/lib/target.sh"
 
-[[ $# -eq 2 ]] || log__fatal "usage: prune.sh <rpm|deb> <outdir>"
-fmt=$1 out=$2
-[[ $fmt == rpm || $fmt == deb ]] || log__fatal "unknown format: $fmt"
-mkdir -p "$out"
-out=$(cd "$out" && pwd)
-
-cfg=$(config__get .repos)
-state=$(state__json)
-
 ################################################################################
-# This format's published packages admitted with a denied repo key, as JSON:
-# [{release, repo, format, name, filename, fingerprint}]
+# A format's published packages admitted with a denied repo key.
+# Arguments:
+#   <rpm|deb>
+# Outputs:
+#   [{release, repo, format, name, filename, fingerprint}] as JSON on stdout.
 ################################################################################
 denied_packages() {
-  base__jq -c --argjson cfg "$cfg" --arg fmt "$fmt" \
-    'import "deny" as deny; deny::packages($cfg) | map(select(.format == $fmt))' <<< "$state"
+  state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
+    'import "deny" as deny; deny::packages($cfg) | map(select(.format == $fmt))'
 }
 
 ################################################################################
-# This format's other published packages that retention drops, as JSON.
+# A format's other published packages that retention drops.
 # Arguments:
-#   <denied>
+#   <rpm|deb> <denied (denied_packages)>
+# Outputs:
+#   The packages as JSON on stdout.
 ################################################################################
 retention_packages() {
-  base__jq -c --argjson cfg "$cfg" --arg fmt "$fmt" --argjson denied "$1" '
+  state__json | base__jq -c --argjson cfg "$(config__get .repos)" --arg fmt "$1" \
+    --argjson denied "$2" '
     import "state" as state; import "retention" as retention;
     state::published_packages | map(select(.format == $fmt)
       | select(. as $p | $denied | any(.release == $p.release and .filename == $p.filename) | not))
-    | retention::apply($cfg) | map(select(.keep | not))' <<< "$state"
+    | retention::apply($cfg) | map(select(.keep | not))'
 }
 
 ################################################################################
 # Writes the delta for record: a pruned patch per package, and the denied ones for their issues.
 # Arguments:
-#   <pruned> <denied>
+#   <rpm|deb> <outdir> <pruned (retention_packages)> <denied (denied_packages)>
 ################################################################################
 write_delta() {
-  jq -n --arg fmt "$fmt" --argjson pruned "$1" --argjson denied "$2" '
+  jq -n --arg fmt "$1" --argjson pruned "$3" --argjson denied "$4" '
     {format: $fmt,
      patches: ([$pruned[] | {release, filename, status: "pruned", reason: "retention"}]
        + [$denied[]
           | {release, filename, status: "pruned", reason: "denied repo key \(.fingerprint)"}]),
-     denied: $denied}' > "$out/prune-$fmt.json"
+     denied: $denied}' > "$2/prune-$1.json"
 }
 
 ################################################################################
-# Package files on the target that state doesn't list as published, one path per line.
+# A format's package files on the target that state doesn't list as published.
+# Arguments:
+#   <rpm|deb>
+# Outputs:
+#   Their paths on stdout, one per line.
 ################################################################################
 orphan_paths() {
-  local pkgdir
+  local fmt=$1 pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-  comm -23 <(target__find "$pkgdir" | sort) <(base__jq -r --arg fmt "$fmt" \
-    'import "prune" as prune; prune::published_paths($fmt)' <<< "$state" | sort)
+  comm -23 <(target__find "$pkgdir" | sort) <(state__json | base__jq -r --arg fmt "$fmt" \
+    'import "prune" as prune; prune::published_paths($fmt)' | sort)
 }
 
 ################################################################################
-# The files to leave out of the metadata, one per line: rpm file names, or deb paths under deb/.
+# The files to leave out of the metadata: rpm file names, or deb paths under deb/.
 # Arguments:
-#   <remove> [orphan path]...
+#   <rpm|deb> <remove (JSON)> [orphan path]...
+# Outputs:
+#   The files on stdout, one per line.
 ################################################################################
 excludes() {
-  local remove=$1 name filename f
-  shift
+  local fmt=$1 remove=$2 name filename f
+  shift 2
   while IFS=$'\t' read -r name filename; do
     if [[ $fmt == rpm ]]; then
       echo "$filename"
@@ -93,18 +96,18 @@ excludes() {
 }
 
 ################################################################################
-# Rewrites the repository metadata without the excluded files.
+# Rewrites a format's repository metadata without the excluded files.
 # Arguments:
-#   <excludes file>
+#   <rpm|deb> <excludes file>
 ################################################################################
 rewrite_metadata() {
-  local work meta
+  local fmt=$1 excludes=$2 work meta
   work=$(mktemp -d)
   if [[ $fmt == rpm ]]; then
-    meta=$(repo__rpm_metadata "$work" "$work/new" "$1")
+    meta=$(repo__rpm_metadata "$work" "$work/new" "$excludes")
     repo__write_rpm_metadata "$meta"
   else
-    meta=$(repo__apt_metadata "$work" "$work/new" "$1")
+    meta=$(repo__apt_metadata "$work" "$work/new" "$excludes")
     repo__write_apt_metadata "$meta"
   fi
 }
@@ -112,35 +115,49 @@ rewrite_metadata() {
 ################################################################################
 # Deletes the removed packages' files and the orphans from the target.
 # Arguments:
-#   <remove> [orphan path]...
+#   <rpm|deb> <remove (JSON)> [orphan path]...
 ################################################################################
 delete_files() {
-  local remove=$1 name filename f
-  shift
+  local fmt=$1 remove=$2 name filename f
+  shift 2
   while IFS=$'\t' read -r name filename; do
     target__rm "$(package__path "$fmt" "$name" "$filename")"
   done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
   for f in "$@"; do target__rm "$f"; done
 }
 
-denied=$(denied_packages)
-pruned=$(retention_packages "$denied")
-write_delta "$pruned" "$denied"
-remove=$(jq -c -s 'add' <<< "$pruned $denied")
+################################################################################
+# Prunes one format: decides what to remove, writes the delta, then rewrites the metadata
+# without it before deleting the files, so metadata never points at a missing file.
+# Arguments:
+#   <rpm|deb> <outdir>
+################################################################################
+main() {
+  local fmt=$1 out denied pruned remove excludes_file
+  local -a orphans
+  mkdir -p "$2"
+  out=$(cd "$2" && pwd)
+  denied=$(denied_packages "$fmt")
+  pruned=$(retention_packages "$fmt" "$denied")
+  write_delta "$fmt" "$out" "$pruned" "$denied"
+  remove=$(jq -c -s 'add' <<< "$pruned $denied")
 
-mapfile -t orphans < <(orphan_paths)
-if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
-  log__info "prune $fmt: nothing to remove"
-  exit 0
-fi
-log__info "prune $fmt: $(jq length <<< "$pruned") by retention," \
-  "$(jq length <<< "$denied") for a denied repo key, ${#orphans[@]} not in state"
+  mapfile -t orphans < <(orphan_paths "$fmt")
+  if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
+    log__info "prune $fmt: nothing to remove"
+    return
+  fi
+  log__info "prune $fmt: $(jq length <<< "$pruned") by retention," \
+    "$(jq length <<< "$denied") for a denied repo key, ${#orphans[@]} not in state"
 
-keys__init_archive
-excludes_file=$(mktemp)
-excludes "$remove" "${orphans[@]}" > "$excludes_file"
-# Metadata first, then deletes, so metadata never points at a missing file.
-rewrite_metadata "$excludes_file"
-delete_files "$remove" "${orphans[@]}"
+  keys__init_archive
+  excludes_file=$(mktemp)
+  excludes "$fmt" "$remove" "${orphans[@]}" > "$excludes_file"
+  rewrite_metadata "$fmt" "$excludes_file"
+  delete_files "$fmt" "$remove" "${orphans[@]}"
+  log__info "prune $fmt: done ($(target__url))"
+}
 
-log__info "prune $fmt: done ($(target__url))"
+[[ $# -eq 2 ]] || log__fatal "usage: prune.sh <rpm|deb> <outdir>"
+[[ $1 == rpm || $1 == deb ]] || log__fatal "unknown format: $1"
+main "$@"

@@ -12,14 +12,6 @@ source "$(dirname "$0")/lib/base.sh"
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/state.sh"
 
-[[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
-mode=$1
-shift
-case $mode in
-  state | issues | all) ;;
-  *) log__fatal "unknown mode: $mode (state, issues, or all)" ;;
-esac
-
 ################################################################################
 # Applies the result files to STATE: release entries first, then the package patches that
 # refer to them.
@@ -62,6 +54,21 @@ file_issues() {
   done < <(base__jq -c -s 'import "record" as record; record::denial_groups' "$@")
 }
 
-[[ $mode == state || $mode == all ]] && update_state "$@"
-[[ $mode == issues || $mode == all ]] && file_issues "$@"
-exit 0
+################################################################################
+# Records the result files: the state, the issues, or both.
+# Arguments:
+#   <state|issues|all> <result.json|delta.json>...
+################################################################################
+main() {
+  local mode=$1
+  shift
+  if [[ $mode == state || $mode == all ]]; then update_state "$@"; fi
+  if [[ $mode == issues || $mode == all ]]; then file_issues "$@"; fi
+}
+
+[[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
+case $1 in
+  state | issues | all) ;;
+  *) log__fatal "unknown mode: $1 (state, issues, or all)" ;;
+esac
+main "$@"

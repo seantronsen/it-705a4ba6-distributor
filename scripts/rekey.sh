@@ -17,6 +17,8 @@ BATCH=50
 
 ################################################################################
 # The published rpms not signed with the current archive key.
+# Globals:
+#   ARCHIVE_FPR (keys__init_archive)
 # Outputs:
 #   [{release, filename}] as JSON on stdout.
 ################################################################################
@@ -51,10 +53,10 @@ resign_batch() {
 # Re-signs the rpms BATCH at a time, recording each batch in the delta as it lands; with none
 # to re-sign, re-signs repomd.xml alone.
 # Arguments:
-#   <delta file>
+#   <delta file> <work dir>
 ################################################################################
 rekey_rpm() {
-  local todo total i batch
+  local delta=$1 work=$2 todo total i batch
   todo=$(rpms_to_resign)
   total=$(jq length <<< "$todo")
   log__info "rekey rpm: $total package(s) to re-sign with $ARCHIVE_FPR"
@@ -62,7 +64,7 @@ rekey_rpm() {
     batch=$(jq -c --argjson i "$i" --argjson n "$BATCH" '.[$i:$i + $n]' <<< "$todo")
     resign_batch "$batch" "$work/batch-$i"
     jq --argjson b "$batch" --arg fpr "$ARCHIVE_FPR" '.patches += [$b[] + {signed_with: $fpr}]' \
-      "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+      "$delta" > "$delta.tmp" && mv "$delta.tmp" "$delta"
     log__info "rekey rpm: $((i + $(jq length <<< "$batch")))/$total re-signed"
   done
   # Nothing to re-sign: still re-sign repomd.xml, which no batch rewrote.
@@ -74,22 +76,33 @@ rekey_rpm() {
 
 ################################################################################
 # Re-signs Release (debs carry no signature).
+# Arguments:
+#   <work dir>
 ################################################################################
 rekey_deb() {
+  local work=$1
   target__get "deb/dists/$SUITE/Release" "$work/dist/Release" || return 0
   repo__sign_apt "$work/dist"
   target__put "$work/dist/Release.gpg" "deb/dists/$SUITE/Release.gpg"
   target__put "$work/dist/InRelease" "deb/dists/$SUITE/InRelease"
 }
 
-[[ $# -eq 2 && ($1 == rpm || $1 == deb) ]] || log__fatal "usage: rekey.sh <rpm|deb> <outdir>"
-fmt=$1
-mkdir -p "$2"
-delta=$(cd "$2" && pwd)/rekey-$fmt.json
-jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
+################################################################################
+# Re-signs one format, then republishes keys/.
+# Arguments:
+#   <rpm|deb> <outdir>
+################################################################################
+main() {
+  local fmt=$1 delta work
+  mkdir -p "$2"
+  delta=$(cd "$2" && pwd)/rekey-$fmt.json
+  jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
+  keys__init_archive
+  work=$(mktemp -d)
+  if [[ $fmt == rpm ]]; then rekey_rpm "$delta" "$work"; else rekey_deb "$work"; fi
+  keys__publish
+  log__info "rekey $fmt: done ($(target__url))"
+}
 
-keys__init_archive
-work=$(mktemp -d)
-if [[ $fmt == rpm ]]; then rekey_rpm "$delta"; else rekey_deb; fi
-keys__publish
-log__info "rekey $fmt: done ($(target__url))"
+[[ $# -eq 2 && ($1 == rpm || $1 == deb) ]] || log__fatal "usage: rekey.sh <rpm|deb> <outdir>"
+main "$@"
