@@ -22,7 +22,7 @@ teardown() {
   # check-keys dates the file by its commit's committer date.
   GIT_COMMITTER_DATE=$(date -u -d '40 days ago' +%Y-%m-%dT%H:%M:%SZ) \
     distributor__edit "next archive key, 40 days ago" \
-    keys__write_public "$(keys__new_archive 60d)" keys/archive-next.asc
+    keys__public_write "$(keys__archive_generate 60d)" keys/archive-next.asc
   run=$(poll__run)
   wait__check "keys job passed" github__has_jobs_concluded "$distributor" "$run" keys success
   wait__check "an Archive key switch due issue" \

@@ -13,9 +13,9 @@ teardown() {
   local role=fixture repo name
   repo=$(settings__get ".repos.$role.remote")
   name=$(suite__repo_name "$repo")
-  crafted__release "$role" v1.0.0 "$name 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
-  crafted__release "$role" v1.0.1 "$name 1.0.1"
+  crafted__release_create "$role" v1.0.1 "$name 1.0.1"
   poll__run > /dev/null
   wait__check "v1.0.1: every package published" state__has --arg k "$repo@v1.0.1" \
     '.[$k].packages | length == 2 and all(.status == "published")'

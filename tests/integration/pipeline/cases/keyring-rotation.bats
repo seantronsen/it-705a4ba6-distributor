@@ -18,13 +18,13 @@ teardown() {
 
 # keys/ for a rotation: the current key and the next.
 write_keys() {
-  keys__write_public "$1" keys/archive.asc && keys__write_public "$2" keys/archive-next.asc
+  keys__public_write "$1" keys/archive.asc && keys__public_write "$2" keys/archive-next.asc
 }
 
 @test "a keys/ change publishes a keyring carrying the current and next keys" {
   local current next before run dir
-  current=$(keys__fpr archive)
-  next=$(keys__new_archive 60d)
+  current=$(keys__fingerprint archive)
+  next=$(keys__archive_generate 60d)
   dir="$(settings__get .run.artifacts_dir)/keyring-rotation"
   before=$(workflow__latest keyring.yml push)
   distributor__edit "next archive key" write_keys "$current" "$next"
@@ -34,6 +34,6 @@ write_keys() {
   wait__check "1.0.0: rpm signed with the current key" state__has \
     --arg k openchami-keyring@1.0.0 --arg f "$current" \
     '.[$k].packages | map(select(.format == "rpm")) | length == 1 and all(.signed_with == $f)'
-  s3__download_release openchami-keyring 1.0.0 "$dir"
+  s3__release_download openchami-keyring 1.0.0 "$dir"
   keyring__check "$dir" 1.0.0 "$current" "$next"
 }

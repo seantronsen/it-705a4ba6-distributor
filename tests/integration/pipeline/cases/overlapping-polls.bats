@@ -36,7 +36,7 @@ not_committed_by() {
   local role=fixture repo distributor first second
   repo=$(settings__get ".repos.$role.remote")
   distributor=$(settings__get .repos.distributor.remote)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   { read -r first && read -r second; } < <(poll__dispatch 2)
   github__run_wait "$distributor" "$first" > /dev/null
   github__run_wait "$distributor" "$second" > /dev/null

@@ -13,18 +13,18 @@ teardown() {
 @test "a release is published to the bucket with its cache headers" {
   local role=fixture repo fpr key meta tmp
   repo=$(settings__get ".repos.$role.remote")
-  fpr=$(keys__fpr archive)
+  fpr=$(keys__fingerprint archive)
   meta="public,max-age=$(settings__get .s3.metadata_max_age),must-revalidate"
   tmp=$(mktemp -d)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published
   for key in $(s3__release_keys "$repo" v1.0.0); do
-    wait__check "$key: immutable" s3__is_cache_control "$key" 'public,max-age=31536000,immutable'
+    wait__check "$key: immutable" s3__has_cache_control "$key" 'public,max-age=31536000,immutable'
   done
   for key in rpm/repodata/repomd.xml rpm/repodata/repomd.xml.asc deb/dists/stable/InRelease \
     deb/dists/stable/Release.gpg keys/archive.asc; do
-    wait__check "$key: $meta" s3__is_cache_control "$key" "$meta"
+    wait__check "$key: $meta" s3__has_cache_control "$key" "$meta"
   done
   s3__get rpm/repodata/repomd.xml "$tmp/repomd.xml"
   s3__get rpm/repodata/repomd.xml.asc "$tmp/repomd.xml.asc"

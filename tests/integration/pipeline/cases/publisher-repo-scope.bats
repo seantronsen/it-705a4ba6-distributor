@@ -15,8 +15,8 @@ teardown() {
   service_repo=$(settings__get .repos.service.remote)
   name=$(suite__repo_name "$repo")
   id=$(github__user_id)
-  distributor__push_config > /dev/null << EOF
-$(distributor__settings)
+  distributor__config_push > /dev/null << EOF
+$(distributor__config_settings)
 publishers:
   "$id": {username: distributor-it, repos: [$service_repo]}
 repos:
@@ -24,7 +24,7 @@ repos:
     allow: $(settings__get '.repos.service.packages | tojson')
   $repo: {}
 EOF
-  crafted__release "$role" v1.0.0 "$name 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: rejected, its pusher may not publish this repo" state__has \
     --arg k "$repo@v1.0.0" --arg r "may not publish $repo" \

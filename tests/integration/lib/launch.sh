@@ -227,7 +227,7 @@ launch__snapshot_repo() {
 # Returns:
 #   0, or 1 when it can't be written.
 ################################################################################
-launch__settings() {
+launch__settings_write() {
   config__build || return 1
   if ! jq --arg id "$1" --arg share "$2" --arg out "$3" --arg engine "$4" \
     '.run = {id: $id, share_dir: $share, output_dir: $out, artifacts_dir: "\($out)/artifacts",
@@ -323,7 +323,7 @@ launch__check_s3() {
 # Returns:
 #   0, or 1 when a secret wasn't set.
 ################################################################################
-launch__set_s3_secrets() {
+launch__s3_secrets_set() {
   local repo name
   repo=$(config__get .repos.distributor.remote) || return 1
   for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
@@ -384,7 +384,7 @@ launch__run() {
     log__error "nothing was run: fix the above first"
     return 1
   fi
-  launch__set_s3_secrets || return 1
+  launch__s3_secrets_set || return 1
   # shellcheck disable=SC2064 # the values are fixed now
   trap "launch__cleanup '$run_dir' '$engine' '$image'" EXIT
 
@@ -397,7 +397,7 @@ launch__run() {
     sock=$(launch__engine_socket "$run_dir") || return 1
     mapfile -t options <<< "$sock"
   fi
-  launch__settings "$id" "$run_dir" "$out" "${socket:+podman-remote}" "$out/settings.json" ||
+  launch__settings_write "$id" "$run_dir" "$out" "${socket:+podman-remote}" "$out/settings.json" ||
     return 1
   log__info "run $id ($suite, $engine); report: $out/report.tap"
 

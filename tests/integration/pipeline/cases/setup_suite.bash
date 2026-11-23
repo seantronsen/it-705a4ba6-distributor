@@ -3,10 +3,10 @@
 
 setup_suite() {
   source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
-  lifecycle__setup_suite
+  lifecycle__suite_setup
 }
 
 teardown_suite() {
   source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
-  lifecycle__teardown_suite
+  lifecycle__suite_teardown
 }

@@ -60,7 +60,7 @@ s3__is_gone() {
 # Returns:
 #   0 when it is, 1 otherwise.
 ################################################################################
-s3__is_cache_control() {
+s3__has_cache_control() {
   [[ $(curl -fsSI "$(s3__url "$1")" | tr -d '\r' |
     sed -n 's/^[Cc]ache-[Cc]ontrol: //p') == "$2" ]]
 }
@@ -73,7 +73,7 @@ s3__is_cache_control() {
 # Returns:
 #   0, or 1 when they weren't written.
 ################################################################################
-s3__apt_https() {
+s3__apt_https_write() {
   if ! cp /etc/ssl/certs/ca-certificates.crt "$1/ca.crt" ||
     ! echo 'Acquire::https::CAInfo "/etc/it-ca.crt";' > "$1/ca.conf"; then
     log__error "can't write apt's CA files to $1"
@@ -82,7 +82,7 @@ s3__apt_https() {
 }
 
 ################################################################################
-# Engine options mounting s3__apt_https's files.
+# Engine options mounting s3__apt_https_write's files.
 # Arguments:
 #   Directory.
 # Outputs:
@@ -112,7 +112,7 @@ s3__package_key() {
 ################################################################################
 s3__release_keys() {
   local format name file
-  state__get | jq -r --arg k "$1@$2" '.[$k].packages[] | [.format, .name, .filename] | @tsv' |
+  state__json | jq -r --arg k "$1@$2" '.[$k].packages[] | [.format, .name, .filename] | @tsv' |
     while IFS=$'\t' read -r format name file; do s3__package_key "$format" "$name" "$file"; done
 }
 
@@ -123,7 +123,7 @@ s3__release_keys() {
 # Returns:
 #   0, or 1 when a download failed.
 ################################################################################
-s3__download_release() {
+s3__release_download() {
   local key
   for key in $(s3__release_keys "$1" "$2"); do
     mkdir -p "$3/$(dirname "$key")"

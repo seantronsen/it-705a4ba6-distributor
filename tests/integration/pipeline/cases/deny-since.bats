@@ -13,15 +13,15 @@ teardown() {
   local role=fixture repo name fpr since
   repo=$(settings__get ".repos.$role.remote")
   name=$(suite__repo_name "$repo")
-  fpr=$(keys__fpr fixture)
-  crafted__release "$role" v1.0.0 "$name 1.0.0"
+  fpr=$(keys__fingerprint fixture)
+  crafted__release_create "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
-  crafted__release "$role" v1.1.0 "$name 1.1.0"
+  crafted__release_create "$role" v1.1.0 "$name 1.1.0"
   poll__run > /dev/null
-  since=$(state__get | jq -r --arg k "$repo@v1.1.0" '.[$k].at')
-  distributor__push_config > /dev/null << EOF
-$(distributor__settings)
-$(distributor__publishers)
+  since=$(state__json | jq -r --arg k "$repo@v1.1.0" '.[$k].at')
+  distributor__config_push > /dev/null << EOF
+$(distributor__config_settings)
+$(distributor__config_publishers)
 repos:
   $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')

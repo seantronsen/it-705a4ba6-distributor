@@ -14,10 +14,10 @@ teardown() {
   local role=fixture repo distributor run before
   repo=$(settings__get ".repos.$role.remote")
   distributor=$(settings__get .repos.distributor.remote)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   # No publishers, and a key the schema doesn't know.
-  run=$(distributor__push_config << EOF
-$(distributor__settings)
+  run=$(distributor__config_push << EOF
+$(distributor__config_settings)
 repos:
   $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
@@ -33,7 +33,7 @@ EOF
     github__has_jobs_concluded "$distributor" "$run" config failure
   wait__check "no state commit" test "$(github__head_sha "$distributor")" = "$before"
   wait__check "v1.0.0: not processed" test "$(state__release_status "$repo" v1.0.0)" = absent
-  distributor__default_config | distributor__push_config > /dev/null
+  distributor__config_default | distributor__config_push > /dev/null
   wait__check "fixed: v1.0.0 published" \
     test "$(state__release_status "$repo" v1.0.0)" = published
 }

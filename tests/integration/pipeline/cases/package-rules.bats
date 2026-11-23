@@ -29,22 +29,22 @@ outcome() {
   # The longer-name rule needs the fixture's name to start with the service repo's plus "-".
   if [[ $me == "$(suite__repo_name "$service_repo")"-* ]]; then longer=true; fi
 
-  distributor__push_config > /dev/null << EOF
-$(distributor__settings)
-$(distributor__publishers)
+  distributor__config_push > /dev/null << EOF
+$(distributor__config_settings)
+$(distributor__config_publishers)
 repos:
   $service_repo:
     allow: $(settings__get '.repos.service.packages + ["it-shared", "it-twice"] | tojson')
   $fixture_repo:
     allow: [it-twice]
 EOF
-  crafted__release fixture v1.0.0-a "zzz-other 1.0.0"
-  crafted__release fixture v1.0.0-b "it-twice 1.0.0"
-  if $longer; then crafted__release service it-c "$me-x 1.0.0"; fi
-  crafted__release service it-d1 "it-shared 1.0.0"
-  crafted__release fixture v1.0.0-e "$me 1.0"
-  crafted__release fixture v1.0.0-f "$me 1.0.0~rc1"
-  crafted__release fixture v1.0.0-g "$me-dup 1.0.0 1" "$me-dup 1.0.0 2"
+  crafted__release_create fixture v1.0.0-a "zzz-other 1.0.0"
+  crafted__release_create fixture v1.0.0-b "it-twice 1.0.0"
+  if $longer; then crafted__release_create service it-c "$me-x 1.0.0"; fi
+  crafted__release_create service it-d1 "it-shared 1.0.0"
+  crafted__release_create fixture v1.0.0-e "$me 1.0"
+  crafted__release_create fixture v1.0.0-f "$me 1.0.0~rc1"
+  crafted__release_create fixture v1.0.0-g "$me-dup 1.0.0 1" "$me-dup 1.0.0 2"
   poll__run > /dev/null
   wait__check "a: a name the repo can't claim" outcome "$fixture_repo" v1.0.0-a rejected \
     "zzz-other is not $me or $me-* and not in allow"
@@ -64,16 +64,16 @@ EOF
     "duplicate deb package $me-dup 1.0.0"
 
   # Moving it-shared to the fixture's allow doesn't hand it over: the service repo published it.
-  distributor__push_config > /dev/null << EOF
-$(distributor__settings)
-$(distributor__publishers)
+  distributor__config_push > /dev/null << EOF
+$(distributor__config_settings)
+$(distributor__config_publishers)
 repos:
   $service_repo:
     allow: $(settings__get '.repos.service.packages + ["it-twice"] | tojson')
   $fixture_repo:
     allow: [it-twice, it-shared]
 EOF
-  crafted__release fixture v1.0.0-d2 "it-shared 2.0.0"
+  crafted__release_create fixture v1.0.0-d2 "it-shared 2.0.0"
   poll__run > /dev/null
   wait__check "d2: a name another repo published first" outcome "$fixture_repo" v1.0.0-d2 rejected \
     "it-shared is already published by $service_repo"

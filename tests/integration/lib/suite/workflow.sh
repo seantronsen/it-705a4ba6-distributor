@@ -72,7 +72,7 @@ workflow__run() {
   conclusion=$(gh api "repos/$repo/actions/runs/$id" -q .conclusion)
   if [[ $conclusion != success ]]; then
     log__error "$1 run $id: $conclusion"
-    github__log_failed "$repo" "$id"
+    github__run_failures_log "$repo" "$id"
     return 1
   fi
   echo "$id"

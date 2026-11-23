@@ -13,7 +13,7 @@ teardown() {
   local role=fixture repo distributor before run
   repo=$(settings__get ".repos.$role.remote")
   distributor=$(settings__get .repos.distributor.remote)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   before=$(github__head_sha "$distributor")
   run=$(poll__run)

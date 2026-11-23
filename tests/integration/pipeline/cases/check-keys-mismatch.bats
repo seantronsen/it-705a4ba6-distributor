@@ -20,9 +20,9 @@ teardown() {
   local role=fixture repo distributor before run
   repo=$(settings__get ".repos.$role.remote")
   distributor=$(settings__get .repos.distributor.remote)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   before=$(workflow__latest keyring.yml push)
-  distributor__edit "another archive key" keys__write_public "$(keys__new_archive 60d)" \
+  distributor__edit "another archive key" keys__public_write "$(keys__archive_generate 60d)" \
     keys/archive.asc
   run=$(workflow__wait_next keyring.yml "$before" push)
   wait__check "the keyring build failed" test "$(github__run_wait "$distributor" "$run")" = failure

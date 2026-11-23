@@ -17,7 +17,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/poll.sh"
 # Outputs:
 #   config/repos.yaml lines on stdout.
 ################################################################################
-distributor__publishers() {
+distributor__config_publishers() {
   gh api user -q '"publishers:\n  \"\(.id)\": {username: \(.login)}"'
 }
 
@@ -27,7 +27,7 @@ distributor__publishers() {
 # Outputs:
 #   config/repos.yaml lines on stdout.
 ################################################################################
-distributor__settings() {
+distributor__config_settings() {
   cat << EOF
 target:
   s3:
@@ -49,10 +49,10 @@ EOF
 # Outputs:
 #   config/repos.yaml content on stdout.
 ################################################################################
-distributor__default_config() {
+distributor__config_default() {
   cat << EOF
-$(distributor__settings)
-$(distributor__publishers)
+$(distributor__config_settings)
+$(distributor__config_publishers)
 repos:
   $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
@@ -69,7 +69,7 @@ EOF
 # Returns:
 #   0, or 1 when the push failed or its poll didn't run.
 ################################################################################
-distributor__push_config() {
+distributor__config_push() {
   local repo dir sha id
   repo=$(settings__get .repos.distributor.remote)
   dir=$(mktemp -d)

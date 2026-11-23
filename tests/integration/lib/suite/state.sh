@@ -12,7 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/suite.sh"
 # Outputs:
 #   The JSON on stdout.
 ################################################################################
-state__get() {
+state__json() {
   gh api -H 'Accept: application/vnd.github.raw' \
     "repos/$(settings__get .repos.distributor.remote)/contents/state/state.json?ref=main"
 }
@@ -25,7 +25,7 @@ state__get() {
 #   0 when the filter's result is true, 1 otherwise.
 ################################################################################
 state__has() {
-  state__get | jq -e "$@" > /dev/null
+  state__json | jq -e "$@" > /dev/null
 }
 
 ################################################################################
@@ -37,7 +37,7 @@ state__has() {
 state__is_valid() {
   local file status
   file=$(mktemp --suffix .json)
-  if ! state__get > "$file"; then
+  if ! state__json > "$file"; then
     log__error "can't read state.json"
     rm -f "$file"
     return 1
@@ -57,7 +57,7 @@ state__is_valid() {
 #   published, skipped, rejected, or absent, on stdout.
 ################################################################################
 state__release_status() {
-  state__get | jq -r --arg k "$1@$2" '.[$k].status // "absent"'
+  state__json | jq -r --arg k "$1@$2" '.[$k].status // "absent"'
 }
 
 ################################################################################
@@ -68,7 +68,7 @@ state__release_status() {
 #   0 when none is, 1 otherwise.
 ################################################################################
 state__has_none_published() {
-  state__get | jq -e --arg r "$1@" '
+  state__json | jq -e --arg r "$1@" '
     all(to_entries[] | select(.key | startswith($r)) | .value.packages[]?; .status != "published")
   ' > /dev/null
 }

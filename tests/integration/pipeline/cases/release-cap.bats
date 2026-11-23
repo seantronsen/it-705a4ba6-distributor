@@ -13,8 +13,8 @@ teardown() {
   local repo tag
   repo=$(settings__get .repos.fixture.remote)
   # The next test's reset restores the seed config.
-  distributor__default_config | sed 's/^max-releases: 256$/max-releases: 3/' \
-    | distributor__push_config > /dev/null
+  distributor__config_default | sed 's/^max-releases: 256$/max-releases: 3/' \
+    | distributor__config_push > /dev/null
   # Empty releases, a couple of seconds apart so discover orders them reliably.
   for tag in v1.0.1 v1.0.2 v1.0.3 v1.0.4; do
     github__release_create "$repo" "$tag"

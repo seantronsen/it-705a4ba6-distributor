@@ -14,7 +14,7 @@ teardown() {
 @test "a real release is admitted and its repositories published" {
   local repo key
   repo=$(settings__get .repos.service.remote)
-  service__release v1.0.0
+  service__release_create v1.0.0
   poll__run > /dev/null
   wait__check "v1.0.0: 6 packages published" state__has --arg k "$repo@v1.0.0" \
     '.[$k].packages | length == 6 and all(.status == "published")'

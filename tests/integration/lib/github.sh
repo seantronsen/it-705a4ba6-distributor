@@ -69,7 +69,7 @@ github__run_wait() {
 # Arguments:
 #   Repo path (owner/name), run id.
 ################################################################################
-github__log_failed() {
+github__run_failures_log() {
   log__error "run: https://github.com/$1/actions/runs/$2"
   gh run view "$2" -R "$1" --log-failed 2>&1 | tail -n 40 >&2
 }
@@ -146,7 +146,7 @@ github__issues() {
 # Returns:
 #   0, or 1 when something couldn't be deleted.
 ################################################################################
-github__wipe() {
+github__repo_wipe() {
   local repo=$1 x failed=false
   for x in $(gh api --paginate "repos/$repo/releases?per_page=100" -q '.[].tag_name'); do
     gh release delete "$x" -R "$repo" --cleanup-tag --yes || failed=true

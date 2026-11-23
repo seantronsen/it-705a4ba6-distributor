@@ -52,14 +52,14 @@ lifecycle__guard() {
 # Returns:
 #   0, or 1 when any step failed.
 ################################################################################
-lifecycle__setup_suite() {
+lifecycle__suite_setup() {
   local repo
   lifecycle__guard || return 1
   keys__create || return 1
   for repo in $(settings__get '.repos[].remote'); do
-    github__wipe "$repo" runs || return 1
+    github__repo_wipe "$repo" runs || return 1
   done
-  keys__set_secrets || return 1
+  keys__secrets_set || return 1
   lifecycle__seed_service || return 1
   lifecycle__seed_fixture || return 1
   lifecycle__seed_distributor
@@ -128,7 +128,7 @@ lifecycle__seed_distributor() {
     log__error "can't clone /src/distributor"
     return 1
   fi
-  distributor__default_config > "$dir/config/repos.yaml"
+  distributor__config_default > "$dir/config/repos.yaml"
   echo '{}' > "$dir/state/state.json"
   # Tests dispatch every poll.
   sed -i '/^  schedule:$/,/^    - cron:/d' "$poll"
@@ -162,9 +162,9 @@ lifecycle__write_marker() {
 lifecycle__reset() {
   local repo
   for repo in $(settings__get '.repos[].remote'); do
-    github__wipe "$repo" || return 1
+    github__repo_wipe "$repo" || return 1
   done
-  keys__set_archive_secret "$(keys__fpr archive)" || return 1
+  keys__archive_secret_set "$(keys__fingerprint archive)" || return 1
   # The service repo's own CI may still run from the seed push; only its release workflow matters.
   lifecycle__reset_distributor
 }
@@ -204,7 +204,7 @@ lifecycle__reset_distributor() {
 # Returns:
 #   0, or 1 when cleaning failed.
 ################################################################################
-lifecycle__teardown_suite() {
+lifecycle__suite_teardown() {
   local repo failed=false
   if suite__is_kept; then
     log__info "keep is set: leaving the repos as the run left them"
@@ -212,9 +212,9 @@ lifecycle__teardown_suite() {
   fi
   lifecycle__guard || return 1
   for repo in $(settings__get '.repos[].remote'); do
-    github__wipe "$repo" runs || failed=true
+    github__repo_wipe "$repo" runs || failed=true
   done
-  keys__delete_secrets || failed=true
+  keys__secrets_delete || failed=true
   if $failed; then
     return 1
   fi

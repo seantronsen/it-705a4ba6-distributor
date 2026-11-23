@@ -29,7 +29,7 @@ keyring__package() {
 # Outputs:
 #   Fingerprints on stdout, sorted, one per line.
 ################################################################################
-keyring__deb_fprs() {
+keyring__deb_fingerprints() {
   dpkg-deb --fsys-tarfile "$1" | tar -xO ./usr/share/keyrings/openchami-keyring.asc |
     keys__gpg --batch --show-keys --with-colons 2> /dev/null |
     awk -F: '$1 == "pub" {p = 1; next} p && $1 == "fpr" {print $10; p = 0}' | sort
@@ -67,8 +67,8 @@ keyring__check() {
   if [[ -z $deb ]]; then
     log__error "no keyring deb $version in $dir"
     failed=true
-  elif [[ $(keyring__deb_fprs "$deb") != "$(printf '%s\n' "$@" | sort)" ]]; then
-    log__error "keyring deb $version carries $(keyring__deb_fprs "$deb" | xargs), not $*"
+  elif [[ $(keyring__deb_fingerprints "$deb") != "$(printf '%s\n' "$@" | sort)" ]]; then
+    log__error "keyring deb $version carries $(keyring__deb_fingerprints "$deb" | xargs), not $*"
     failed=true
   fi
   ! $failed

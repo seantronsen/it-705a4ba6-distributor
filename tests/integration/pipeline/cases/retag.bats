@@ -12,9 +12,9 @@ teardown() {
 @test "a retagged copy of an admitted release is rejected" {
   local role=fixture repo
   repo=$(settings__get ".repos.$role.remote")
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
-  crafted__copy_release "$role" v1.0.0 v1.0.0-retag
+  crafted__release_copy "$role" v1.0.0 v1.0.0-retag
   poll__run > /dev/null
   wait__check "rejected" test "$(state__release_status "$repo" v1.0.0-retag)" = rejected
   wait__check "every package already admitted" state__has \

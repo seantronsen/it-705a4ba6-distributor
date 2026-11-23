@@ -1,12 +1,69 @@
 # shellcheck shell=bash
-# Installing openchami-keyring with each distro's package manager, then trusting the published
-# repository through the key it installed instead of the published key file.
+# Each distro's own package manager installing from the published repository, in a clean sibling
+# container: a package, checking signatures against the archive key from /repo/keys/archive.asc
+# (the directory mounted at /repo); or openchami-keyring, then trusting the repository through
+# the key it installed instead. The base URL is the bucket's.
 
 [[ -n ${_IT_INSTALL_SH:-} ]] && return 0
 _IT_INSTALL_SH=1
 
-source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../engine.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/engine.sh"
+
+################################################################################
+# Installs a package with dnf, only the published repository enabled.
+# Arguments:
+#   Image, the published files' directory, base URL, package, then extra engine options.
+# Returns:
+#   0 when installed, 1 otherwise.
+################################################################################
+install__package_dnf() {
+  local image=$1 dir=$2 base=$3 package=$4
+  shift 4
+  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \
+    bash -s << 'EOF'; then
+set -euo pipefail
+cat > /etc/yum.repos.d/it.repo << REPO
+[it]
+name=it
+baseurl=$BASE/rpm
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///repo/keys/archive.asc
+REPO
+dnf -y -q --disablerepo='*' --enablerepo=it install "$PACKAGE"
+rpm -q "$PACKAGE"
+EOF
+    log__error "dnf on $image couldn't install $package from $base"
+    return 1
+  fi
+}
+
+################################################################################
+# Installs a package with apt, only the published repository configured, signed-by the archive
+# key.
+# Arguments:
+#   Image, the published files' directory, base URL, package, then extra engine options.
+# Returns:
+#   0 when installed, 1 otherwise.
+################################################################################
+install__package_apt() {
+  local image=$1 dir=$2 base=$3 package=$4
+  shift 4
+  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \
+    bash -s << 'EOF'; then
+set -euo pipefail
+install -Dm644 /repo/keys/archive.asc /etc/apt/keyrings/it.asc
+echo "deb [signed-by=/etc/apt/keyrings/it.asc] $BASE/deb stable main" > /etc/apt/it.list
+apt=(apt-get -o Dir::Etc::sourcelist=/etc/apt/it.list -o Dir::Etc::sourceparts=-)
+"${apt[@]}" update -qq
+"${apt[@]}" install -y -qq "$PACKAGE"
+dpkg -s "$PACKAGE" | grep ^Version
+EOF
+    log__error "apt on $image couldn't install $package from $base"
+    return 1
+  fi
+}
 
 ################################################################################
 # dnf: installs the keyring (trusting keys/archive.asc), then refreshes the repository with

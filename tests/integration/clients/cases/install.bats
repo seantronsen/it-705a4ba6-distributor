@@ -8,16 +8,16 @@ setup_file() {
   repo=$(settings__get ".repos.$role.remote")
   dir=$(install_dir)
   lifecycle__reset
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published
   workflow__run keyring.yml > /dev/null
   wait__check "openchami-keyring 1.0.0: published" \
-    test "$(state__get | jq -r '."openchami-keyring@1.0.0".status')" = published
+    test "$(state__json | jq -r '."openchami-keyring@1.0.0".status')" = published
   # The bootstrap key, mounted at /repo/keys/archive.asc.
   mkdir -p "$dir/keys"
-  keys__write_public "$(keys__fpr archive)" "$dir/keys/archive.asc"
-  s3__apt_https "$dir"
+  keys__public_write "$(keys__fingerprint archive)" "$dir/keys/archive.asc"
+  s3__apt_https_write "$dir"
 }
 
 setup() {
@@ -36,14 +36,14 @@ install_dir() { echo "$(settings__get .run.artifacts_dir)/s3-install"; }
 package() { suite__repo_name "$(settings__get .repos.fixture.remote)"; }
 
 @test "fedora: dnf installs a release from the bucket" {
-  target__install_dnf "$(settings__get .containers.images.fedora)" \
+  install__package_dnf "$(settings__get .containers.images.fedora)" \
     "$(install_dir)" "$(settings__get .s3.url)" "$(package)"
 }
 
 @test "debian: apt installs a release from the bucket" {
   local -a opts
   mapfile -t opts < <(s3__apt_https_options "$(install_dir)")
-  target__install_apt "$(settings__get .containers.images.debian)" \
+  install__package_apt "$(settings__get .containers.images.debian)" \
     "$(install_dir)" "$(settings__get .s3.url)" "$(package)" \
     "${opts[@]}"
 }

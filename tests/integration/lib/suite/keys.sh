@@ -31,7 +31,7 @@ keys__gpg() {
 # Outputs:
 #   The fingerprint on stdout.
 ################################################################################
-keys__fpr() {
+keys__fingerprint() {
   cat "$(settings__get .run.share_dir)/keys/$1.fpr"
 }
 
@@ -44,7 +44,7 @@ keys__fpr() {
 # Returns:
 #   0, or 1 when generation failed.
 ################################################################################
-keys__new() {
+keys__generate() {
   local fpr
   fpr=$(keys__gpg --batch --yes --status-fd 1 --passphrase '' --pinentry-mode loopback \
     --quick-generate-key "$@" 2> /dev/null | awk '$2 == "KEY_CREATED" {print $4}')
@@ -64,8 +64,8 @@ keys__new() {
 # Returns:
 #   0, or 1 when generation failed.
 ################################################################################
-keys__new_archive() {
-  keys__new "distributor-it archive $RANDOM <it-archive@invalid>" \
+keys__archive_generate() {
+  keys__generate "distributor-it archive $RANDOM <it-archive@invalid>" \
     "$(settings__get .keys.algorithm_archive)" sign "$1"
 }
 
@@ -85,7 +85,7 @@ keys__certify() {
 }
 
 ################################################################################
-# Creates the key chain and records each fingerprint (see keys__fpr).
+# Creates the key chain and records each fingerprint (see keys__fingerprint).
 # Returns:
 #   0, or 1 when a key couldn't be made.
 ################################################################################
@@ -94,18 +94,18 @@ keys__create() {
   dir=$(settings__get .run.share_dir)
   install -d -m 700 "$dir/gnupg" "$dir/keys"
   # Repo keys outlive gpg-sign-artifacts' 30-day expiry check, and the archive key check-keys'.
-  root=$(keys__new 'distributor-it root <it-root@invalid>' \
+  root=$(keys__generate 'distributor-it root <it-root@invalid>' \
     "$(settings__get .keys.algorithm_attestation)" cert 7d) || return 1
   echo "$root" > "$dir/keys/root.fpr"
   log__info "keys: root $root"
   for role in $(settings__get '.repos | del(.distributor) | keys[]'); do
-    fpr=$(keys__new "$(settings__get ".repos.$role.remote") RPM Signing Key" \
+    fpr=$(keys__generate "$(settings__get ".repos.$role.remote") RPM Signing Key" \
       "$(settings__get .keys.algorithm_attestation)" cert 60d) || return 1
     keys__certify "$root" "$fpr" || return 1
     echo "$fpr" > "$dir/keys/$role.fpr"
     log__info "keys: $role $fpr"
   done
-  archive=$(keys__new_archive 60d) || return 1
+  archive=$(keys__archive_generate 60d) || return 1
   echo "$archive" > "$dir/keys/archive.fpr"
   log__info "keys: archive $archive"
 }
@@ -118,7 +118,7 @@ keys__create() {
 # Returns:
 #   0, or 1 when the secret wasn't set.
 ################################################################################
-keys__set_archive_secret() {
+keys__archive_secret_set() {
   if ! keys__archive_secret "$1" |
     gh secret set ARCHIVE_GPG_KEY -R "$(settings__get .repos.distributor.remote)"; then
     log__error "can't set ARCHIVE_GPG_KEY to $1"
@@ -135,7 +135,7 @@ keys__set_archive_secret() {
 ################################################################################
 keys__archive_secret() {
   if [[ $1 == locked ]]; then
-    keys__locked_archive
+    keys__archive_locked
   else
     keys__gpg --armor --export-secret-keys "$1"
   fi
@@ -148,9 +148,9 @@ keys__archive_secret() {
 # Returns:
 #   0, or 1 when the passphrase couldn't be set.
 ################################################################################
-keys__locked_archive() {
+keys__archive_locked() {
   local home fpr status=0
-  fpr=$(keys__fpr archive)
+  fpr=$(keys__fingerprint archive)
   # A copy of the GnuPG home, so the run's own copy stays unprotected.
   home=$(mktemp -d) || return 1
   cp -a "$(settings__get .run.share_dir)/gnupg/." "$home/"
@@ -172,22 +172,22 @@ keys__locked_archive() {
 # Returns:
 #   0, or 1 when a secret wasn't set.
 ################################################################################
-keys__set_secrets() {
+keys__secrets_set() {
   local repo
   for repo in $(settings__get '.repos[].remote'); do
-    if ! keys__gpg --armor --export "$(keys__fpr root)" |
+    if ! keys__gpg --armor --export "$(keys__fingerprint root)" |
       gh secret set MASTER_PUBLIC_ASC -R "$repo" ||
-      ! printf '%s' "$(keys__fpr root)" | gh secret set MASTER_FPR -R "$repo"; then
+      ! printf '%s' "$(keys__fingerprint root)" | gh secret set MASTER_FPR -R "$repo"; then
       log__error "can't set the root key secrets on $repo"
       return 1
     fi
   done
-  if ! keys__gpg --armor --export-secret-keys "$(keys__fpr service)" | base64 -w0 |
+  if ! keys__gpg --armor --export-secret-keys "$(keys__fingerprint service)" | base64 -w0 |
     gh secret set GPG_REPO_CERT_KEY_B64 -R "$(settings__get .repos.service.remote)"; then
     log__error "can't set GPG_REPO_CERT_KEY_B64"
     return 1
   fi
-  keys__set_archive_secret "$(keys__fpr archive)"
+  keys__archive_secret_set "$(keys__fingerprint archive)"
 }
 
 ################################################################################
@@ -195,7 +195,7 @@ keys__set_secrets() {
 # Returns:
 #   0, or 1 when a secret couldn't be deleted.
 ################################################################################
-keys__delete_secrets() {
+keys__secrets_delete() {
   local repo name failed=false
   for repo in $(settings__get '.repos[].remote'); do
     for name in $(gh secret list -R "$repo" --json name -q '.[].name'); do
@@ -215,7 +215,7 @@ keys__delete_secrets() {
 # Returns:
 #   0, or 1 when it can't be written.
 ################################################################################
-keys__write_public() {
+keys__public_write() {
   if ! mkdir -p "$(dirname "$2")" || ! keys__gpg --armor --export "$1" > "$2"; then
     log__error "can't write $1's public key to $2"
     return 1

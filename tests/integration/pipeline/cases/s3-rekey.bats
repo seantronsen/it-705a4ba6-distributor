@@ -19,13 +19,13 @@ rpms_signed_with() {
 @test "rekey re-signs the bucket with the new archive key" {
   local role=fixture repo old new tmp
   repo=$(settings__get ".repos.$role.remote")
-  old=$(keys__fpr archive)
+  old=$(keys__fingerprint archive)
   tmp=$(mktemp -d)
-  crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: rpm signed with the old key" rpms_signed_with "$repo@v1.0.0" "$old"
-  new=$(keys__new_archive 60d)
-  keys__set_archive_secret "$new"
+  new=$(keys__archive_generate 60d)
+  keys__archive_secret_set "$new"
   workflow__run rekey.yml > /dev/null
   wait__check "v1.0.0: rpm signed with the new key" rpms_signed_with "$repo@v1.0.0" "$new"
   s3__get rpm/repodata/repomd.xml "$tmp/repomd.xml"

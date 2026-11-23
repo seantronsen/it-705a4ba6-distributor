@@ -12,7 +12,7 @@ teardown() {
 @test "a prerelease is ignored" {
   local role=fixture repo
   repo=$(settings__get ".repos.$role.remote")
-  crafted__release "$role" v9.0.0-rc1 --prerelease "$(suite__repo_name "$repo") 9.0.0"
+  crafted__release_create "$role" v9.0.0-rc1 --prerelease "$(suite__repo_name "$repo") 9.0.0"
   poll__run > /dev/null
   wait__check "no state entry" test "$(state__release_status "$repo" v9.0.0-rc1)" = absent
   wait__check "no issue" \

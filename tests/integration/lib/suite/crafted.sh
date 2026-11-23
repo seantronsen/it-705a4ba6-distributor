@@ -19,7 +19,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../wait.sh"
 # Returns:
 #   0, or 1 when the build failed.
 ################################################################################
-crafted__deb() {
+crafted__build_deb() {
   local out=$1 name=$2 version=$3 rev=${4:-1} root
   root=$(mktemp -d)
   mkdir -p "$root/DEBIAN" "$root/usr/share/doc/$name"
@@ -45,7 +45,7 @@ EOF
 # Returns:
 #   0, or 1 when the build failed.
 ################################################################################
-crafted__rpm() {
+crafted__build_rpm() {
   local out=$1 name=$2 version=$3 rel=${4:-1} top
   top=$(mktemp -d)
   mkdir -p "$top/SPECS"
@@ -77,17 +77,17 @@ EOF
 # Returns:
 #   0, or 1 when signing failed.
 ################################################################################
-crafted__sign() {
+crafted__sign_checksums() {
   local dir=$1 role=$2 repo signing
   repo=$(settings__get ".repos.$role.remote") || return 1
   if ! (cd "$dir" && sha256sum -- *.rpm *.deb > checksums.txt); then
     log__error "can't checksum $dir"
     return 1
   fi
-  signing=$(keys__new "$repo Release (distributor-it) <it@invalid>" \
+  signing=$(keys__generate "$repo Release (distributor-it) <it@invalid>" \
     "$(settings__get .keys.algorithm_attestation)" sign 1d) || return 1
   if [[ ${3:-} != foreign ]]; then
-    keys__certify "$(keys__fpr "$role")" "$signing" || return 1
+    keys__certify "$(keys__fingerprint "$role")" "$signing" || return 1
   fi
   if ! keys__gpg --batch --yes --armor --local-user "$signing" --detach-sign \
     -o "$dir/checksums.txt.asc" "$dir/checksums.txt"; then
@@ -95,8 +95,8 @@ crafted__sign() {
     return 1
   fi
   keys__gpg --armor --export "$signing" > "$dir/pubkey-signing.asc"
-  keys__gpg --armor --export "$(keys__fpr "$role")" > "$dir/pubkey-repo.asc"
-  keys__gpg --armor --export "$(keys__fpr root)" > "$dir/pubkey-org.asc"
+  keys__gpg --armor --export "$(keys__fingerprint "$role")" > "$dir/pubkey-repo.asc"
+  keys__gpg --armor --export "$(keys__fingerprint root)" > "$dir/pubkey-org.asc"
 }
 
 ################################################################################
@@ -124,7 +124,7 @@ crafted__push_tag() {
 # Returns:
 #   0, or 1 when building, signing, or the release failed.
 ################################################################################
-crafted__release() {
+crafted__release_create() {
   local role=$1 tag=$2 repo dir spec sign_as='' push=true gh_opts=()
   shift 2
   repo=$(settings__get ".repos.$role.remote") || return 1
@@ -143,11 +143,11 @@ crafted__release() {
   dir=$(mktemp -d)
   for spec in "$@"; do
     # shellcheck disable=SC2086 # a spec is "name version [revision]"
-    crafted__deb "$dir" $spec || return 1
+    crafted__build_deb "$dir" $spec || return 1
     # shellcheck disable=SC2086
-    crafted__rpm "$dir" $spec || return 1
+    crafted__build_rpm "$dir" $spec || return 1
   done
-  crafted__sign "$dir" "$role" ${sign_as:+"$sign_as"} || return 1
+  crafted__sign_checksums "$dir" "$role" ${sign_as:+"$sign_as"} || return 1
   if $push; then crafted__push_tag "$repo" "$tag" || return 1; fi
   github__release_create "$repo" "$tag" "${gh_opts[@]}" "$dir"/* || return 1
   log__info "released $repo $tag ($*)"
@@ -160,7 +160,7 @@ crafted__release() {
 # Returns:
 #   0, or 1 when the download or the release failed.
 ################################################################################
-crafted__copy_release() {
+crafted__release_copy() {
   local repo dir
   repo=$(settings__get ".repos.$1.remote") || return 1
   dir=$(mktemp -d)

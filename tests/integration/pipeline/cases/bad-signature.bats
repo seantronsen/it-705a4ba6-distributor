@@ -13,7 +13,7 @@ teardown() {
   local role=fixture repo reason
   repo=$(settings__get ".repos.$role.remote")
   reason="trust chain or checksums.txt signature didn't verify (see the run log)"
-  crafted__release "$role" v1.0.0 --foreign "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "$role" v1.0.0 --foreign "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "rejected" test "$(state__release_status "$repo" v1.0.0)" = rejected
   wait__check "trust chain reason" state__has --arg k "$repo@v1.0.0" \

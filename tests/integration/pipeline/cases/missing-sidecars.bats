@@ -19,7 +19,7 @@ teardown() {
     '[.[$k].reasons[] | select(startswith("missing "))] | length == 4'
   wait__check "one open issue" \
     test "$(distributor__issue_count "Rejected release: $repo@v1.0.0" OPEN)" = 1
-  at=$(state__get | jq -r --arg k "$repo@v1.0.0" '.[$k].at')
+  at=$(state__json | jq -r --arg k "$repo@v1.0.0" '.[$k].at')
   poll__run > /dev/null
   wait__check "not processed again" state__has --arg k "$repo@v1.0.0" --arg at "$at" \
     '.[$k].at == $at'

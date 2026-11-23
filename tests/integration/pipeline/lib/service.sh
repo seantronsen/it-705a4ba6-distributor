@@ -18,7 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/github.sh"
 # Returns:
 #   0 when published, 1 when the build failed or timed out.
 ################################################################################
-service__release() {
+service__release_create() {
   local repo dir
   repo=$(settings__get .repos.service.remote)
   dir=$(mktemp -d)
@@ -55,7 +55,7 @@ service__release_state() {
   # The release is published within the run; this rereads it in case the first read lagged.
   service__is_published "$1" && return 0
   log__error "release run for $1: ${conclusion:-none}, release not published"
-  github__log_failed "$repo" "$id"
+  github__run_failures_log "$repo" "$id"
   return 2
 }
 
