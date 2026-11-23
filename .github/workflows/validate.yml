@@ -4,7 +4,7 @@
 #
 # The one pull_request workflow: no secrets and read-only, so a PR can't reach anything. No paths
 # filter, since a required check that doesn't run blocks the PR.
-name: validate-config
+name: validate
 
 on:
   pull_request:
