@@ -62,10 +62,18 @@ metadata__rpm_build() {
     createrepo_c "${RPM_COMPRESS[@]}" "$new"
     result=$new
   fi
-  rm -f "$result/repodata/repomd.xml.asc"
-  gpg --batch --armor --detach-sign -o "$result/repodata/repomd.xml.asc" \
-    "$result/repodata/repomd.xml"
+  metadata__rpm_repomd_sign "$result/repodata"
   echo "$result"
+}
+
+################################################################################
+# Signs repomd.xml with the archive key: repomd.xml.asc beside it, replacing any old one.
+# Arguments:
+#   <dir holding repomd.xml>
+################################################################################
+metadata__rpm_repomd_sign() {
+  rm -f "$1/repomd.xml.asc"
+  gpg --batch --armor --detach-sign -o "$1/repomd.xml.asc" "$1/repomd.xml"
 }
 
 ################################################################################

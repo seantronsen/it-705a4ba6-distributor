@@ -69,7 +69,7 @@ resign_rpms() {
   done
   # Nothing to re-sign: still re-sign repomd.xml, which no batch rewrote.
   if [[ $total -eq 0 ]] && target__file_get rpm/repodata/repomd.xml "$work/repomd.xml"; then
-    gpg --batch --armor --detach-sign -o "$work/repomd.xml.asc" "$work/repomd.xml"
+    metadata__rpm_repomd_sign "$work"
     target__file_put "$work/repomd.xml.asc" rpm/repodata/repomd.xml.asc
   fi
 }
