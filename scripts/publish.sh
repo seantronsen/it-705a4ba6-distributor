@@ -34,26 +34,6 @@ admitted_packages() {
 }
 
 ################################################################################
-# The files to leave out of the existing metadata: the new packages' (rpm file names, or deb
-# paths under deb/), so a retried publish replaces their entries instead of duplicating them.
-# Arguments:
-#   <rpm|deb> <new packages (admitted_packages)>
-# Outputs:
-#   The files on stdout, one per line.
-################################################################################
-metadata_excludes() {
-  local fmt=$1 new=$2 name filename rel
-  while IFS=$'\t' read -r name filename; do
-    if [[ $fmt == rpm ]]; then
-      echo "$filename"
-    else
-      rel=$(package__target_path deb "$name" "$filename")
-      echo "${rel#*/}"
-    fi
-  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$new")
-}
-
-################################################################################
 # Copies the new packages into the staging dir at their target paths, signing the rpms.
 # Arguments:
 #   <rpm|deb> <new packages (admitted_packages)> <staging dir>
@@ -98,32 +78,6 @@ write_publish_delta() {
 }
 
 ################################################################################
-# Builds a format's repository metadata: the target's, minus the excluded files, plus the staged
-# packages.
-# Arguments:
-#   <rpm|deb> <work dir holding excludes and new/>
-# Outputs:
-#   The directory holding the new metadata on stdout.
-################################################################################
-build_metadata() {
-  local fmt=$1 work=$2
-  if [[ $fmt == rpm ]]; then
-    metadata__rpm_build "$work" "$work/new" "$work/excludes"
-  else
-    metadata__apt_build "$work" "$work/new" "$work/excludes"
-  fi
-}
-
-################################################################################
-# Writes a format's built metadata to the target.
-# Arguments:
-#   <rpm|deb> <metadata dir (build_metadata)>
-################################################################################
-write_metadata() {
-  if [[ $1 == rpm ]]; then metadata__rpm_write "$2"; else metadata__apt_write "$2"; fi
-}
-
-################################################################################
 # Publishes one format: writes the delta (rpms record the archive key that signed them, so rekey
 # knows what to re-sign), then the packages, then the metadata merging them in, so metadata never
 # points at a missing file.
@@ -147,11 +101,12 @@ main() {
   keys__archive_load
   write_publish_delta "$fmt" "$delta" "$new"
   work=$(mktemp -d)
-  metadata_excludes "$fmt" "$new" > "$work/excludes"
+  # A retried publish replaces the new packages' existing entries instead of duplicating them.
+  metadata__excludes "$fmt" "$new" > "$work/excludes"
   stage_packages "$fmt" "$new" "$work/new"
-  meta=$(build_metadata "$fmt" "$work")
+  meta=$(metadata__build "$fmt" "$work" "$work/new" "$work/excludes")
   upload_packages "$fmt" "$new" "$work/new"
-  write_metadata "$fmt" "$meta"
+  metadata__write "$fmt" "$meta"
   keys__publish
   log__info "publish $fmt: done ($(target__url))"
 }

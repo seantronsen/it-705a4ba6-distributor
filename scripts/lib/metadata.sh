@@ -7,6 +7,7 @@ _LIB_METADATA_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/package.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/target.sh"
 
 RPM_COMPRESS=(--general-compress-type=gz --no-database --quiet)
@@ -177,4 +178,50 @@ metadata__apt_write() {
   for f in Release Release.gpg InRelease; do
     target__file_put "$dist/$f" "deb/dists/$SUITE/$f"
   done
+}
+
+################################################################################
+# The files to leave out of the target's metadata when rebuilding it: rpm file names, or deb
+# paths under deb/.
+# Arguments:
+#   <rpm|deb> <packages, as JSON [{name, filename}]> [target path]...
+# Outputs:
+#   The files on stdout, one per line.
+################################################################################
+metadata__excludes() {
+  local fmt=$1 packages=$2 name filename path
+  shift 2
+  while IFS=$'\t' read -r name filename; do
+    if [[ $fmt == rpm ]]; then
+      echo "$filename"
+    else
+      path=$(package__target_path deb "$name" "$filename")
+      echo "${path#deb/}"
+    fi
+  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$packages")
+  for path in "$@"; do
+    if [[ $fmt == rpm ]]; then echo "${path##*/}"; else echo "${path#deb/}"; fi
+  done
+}
+
+################################################################################
+# Rebuilds a format's metadata (metadata__rpm_build or metadata__apt_build).
+# Arguments:
+#   <rpm|deb> <work dir> <new dir> <excludes file>
+# Outputs:
+#   The directory holding the new metadata on stdout.
+################################################################################
+metadata__build() {
+  local fmt=$1
+  shift
+  if [[ $fmt == rpm ]]; then metadata__rpm_build "$@"; else metadata__apt_build "$@"; fi
+}
+
+################################################################################
+# Writes a format's rebuilt metadata to the target (metadata__rpm_write or metadata__apt_write).
+# Arguments:
+#   <rpm|deb> <metadata dir (metadata__build)>
+################################################################################
+metadata__write() {
+  if [[ $1 == rpm ]]; then metadata__rpm_write "$2"; else metadata__apt_write "$2"; fi
 }

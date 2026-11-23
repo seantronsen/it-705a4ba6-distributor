@@ -77,46 +77,6 @@ orphan_package_paths() {
 }
 
 ################################################################################
-# The files to leave out of the metadata: rpm file names, or deb paths under deb/.
-# Arguments:
-#   <rpm|deb> <remove (JSON)> [orphan path]...
-# Outputs:
-#   The files on stdout, one per line.
-################################################################################
-metadata_excludes() {
-  local fmt=$1 remove=$2 name filename f
-  shift 2
-  while IFS=$'\t' read -r name filename; do
-    if [[ $fmt == rpm ]]; then
-      echo "$filename"
-    else
-      f=$(package__target_path deb "$name" "$filename")
-      echo "${f#*/}"
-    fi
-  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
-  for f in "$@"; do
-    if [[ $fmt == rpm ]]; then echo "${f##*/}"; else echo "${f#deb/}"; fi
-  done
-}
-
-################################################################################
-# Rewrites a format's repository metadata without the excluded files.
-# Arguments:
-#   <rpm|deb> <excludes file>
-################################################################################
-rewrite_metadata() {
-  local fmt=$1 excludes=$2 work meta
-  work=$(mktemp -d)
-  if [[ $fmt == rpm ]]; then
-    meta=$(metadata__rpm_build "$work" "$work/new" "$excludes")
-    metadata__rpm_write "$meta"
-  else
-    meta=$(metadata__apt_build "$work" "$work/new" "$excludes")
-    metadata__apt_write "$meta"
-  fi
-}
-
-################################################################################
 # Deletes the removed packages' files and the orphans from the target.
 # Arguments:
 #   <rpm|deb> <remove (JSON)> [orphan path]...
@@ -137,7 +97,7 @@ delete_package_files() {
 #   <rpm|deb> <outdir>
 ################################################################################
 main() {
-  local fmt=$1 out denied pruned remove excludes_file
+  local fmt=$1 out denied pruned remove work meta
   local -a orphans
   mkdir -p "$2"
   out=$(cd "$2" && pwd)
@@ -155,9 +115,10 @@ main() {
     "$(jq length <<< "$denied") for a denied repo key, ${#orphans[@]} not in state"
 
   keys__archive_load
-  excludes_file=$(mktemp)
-  metadata_excludes "$fmt" "$remove" "${orphans[@]}" > "$excludes_file"
-  rewrite_metadata "$fmt" "$excludes_file"
+  work=$(mktemp -d)
+  metadata__excludes "$fmt" "$remove" "${orphans[@]}" > "$work/excludes"
+  meta=$(metadata__build "$fmt" "$work" "$work/new" "$work/excludes")
+  metadata__write "$fmt" "$meta"
   delete_package_files "$fmt" "$remove" "${orphans[@]}"
   log__info "prune $fmt: done ($(target__url))"
 }
