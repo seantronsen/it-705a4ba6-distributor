@@ -20,7 +20,6 @@ shopt -s inherit_errexit
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CONFIG=${CONFIG:-$ROOT/config/repos.yaml}
 STATE=${STATE:-$ROOT/state/state.json}
-GITHUB_API=${GITHUB_API_URL:-https://api.github.com}
 # shellcheck disable=SC2034 # used by the scripts that source this
 {
   SUITE=stable
@@ -51,33 +50,17 @@ state_json() {
 
 # --- GitHub API -------------------------------------------------------------------------------
 
-gh_api() { # <path> [curl args...]; GH_ACCEPT overrides the Accept header
-  local path=$1; shift
-  local auth=()
-  [[ -n ${GITHUB_TOKEN:-} ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
-  curl -fsSL --retry 3 -H "Accept: ${GH_ACCEPT:-application/vnd.github+json}" \
-    -H 'X-GitHub-Api-Version: 2022-11-28' "${auth[@]}" "$@" "$GITHUB_API/$path"
-}
-
 uri() { jq -rn --arg s "$1" '$s | @uri'; }
 
 # Releases of a repo as a JSON array of {tag_name, draft, prerelease, published_at}.
-# Each page is trimmed on stdin: a full page outgrows the command-line argument limit.
 releases_list() { # <owner/repo>
-  local repo=$1 page=1 all='[]' batch
-  while :; do
-    batch=$(gh_api "repos/$repo/releases?per_page=100&page=$page" \
-      | jq -c 'map({tag_name, draft, prerelease, published_at})')
-    all=$(jq -c -s 'add' <<< "$all $batch")
-    [[ $(jq length <<< "$batch") -lt 100 ]] && break
-    page=$((page + 1))
-  done
-  echo "$all"
+  gh api --paginate "repos/$1/releases?per_page=100" \
+    --jq '.[] | {tag_name, draft, prerelease, published_at}' | jq -s -c .
 }
 
 # A release's assets as a JSON array of {name, id}.
 release_assets() { # <owner/repo> <tag>
-  gh_api "repos/$1/releases/tags/$(uri "$2")" | jq -c '[.assets[] | {name, id}]'
+  gh api "repos/$1/releases/tags/$(uri "$2")" | jq -c '[.assets[] | {name, id}]'
 }
 
 # Who pushed and who ran a tag's push runs, as a JSON array of
@@ -108,13 +91,13 @@ tag_push_actors() { # <owner/repo> <tag>
 }
 
 asset_fetch() { # <owner/repo> <asset-id> <dest>
-  GH_ACCEPT=application/octet-stream gh_api "repos/$1/releases/assets/$2" -o "$3"
+  gh api -H 'Accept: application/octet-stream' "repos/$1/releases/assets/$2" > "$3"
 }
 
 # Open an issue with this title and label, unless an open one already exists.
 issue_ensure() { # <title> <label> <body>
   local title=$1 label=$2 body=$3 number
-  number=$(gh_api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(uri "$label")&per_page=100" \
+  number=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(uri "$label")&per_page=100" \
     | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')
   if [[ -n $number ]]; then
     log "issue #$number already open: $title"
@@ -126,17 +109,16 @@ issue_ensure() { # <title> <label> <body>
 # Close the open issue with this title and label, if any.
 issue_close() { # <title> <label> <comment>
   local number
-  number=$(gh_api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(uri "$2")&per_page=100" \
+  number=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$(uri "$2")&per_page=100" \
     | jq -r --arg t "$1" '[.[] | select(.title == $t)][0].number // empty')
   [[ -n $number ]] || return 0
-  gh_api "repos/$GITHUB_REPOSITORY/issues/$number/comments" -X POST \
-    --data "$(jq -n --arg b "$3" '{body: $b}')" > /dev/null
-  gh_api "repos/$GITHUB_REPOSITORY/issues/$number" -X PATCH --data '{"state": "closed"}' > /dev/null
+  gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$number/comments" -f body="$3" > /dev/null
+  gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$number" -f state=closed > /dev/null
 }
 
 issue_create() { # <title> <label> <body>
-  gh_api "repos/$GITHUB_REPOSITORY/issues" -X POST \
-    --data "$(jq -n --arg t "$1" --arg l "$2" --arg b "$3" '{title: $t, body: $b, labels: [$l]}')" > /dev/null
+  gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f title="$1" -f body="$3" -f "labels[]=$2" \
+    > /dev/null
 }
 
 # --- Publish target ---------------------------------------------------------------------------
