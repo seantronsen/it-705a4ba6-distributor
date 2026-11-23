@@ -1,19 +1,32 @@
 # shellcheck shell=bash
-# Repository metadata updates for publish, without downloading old packages.
-# Needs lib.sh, target_init, and archive_key_init.
+# Repository metadata updates for publish, prune, and rekey, without downloading old packages.
+# Needs target__init and keys__init_archive first.
+
+[[ -n ${_LIB_REPO_SH:-} ]] && return 0
+_LIB_REPO_SH=1
+
+source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/target.sh"
 
 RPM_COMPRESS=(--general-compress-type=gz --no-database --quiet)
 
+################################################################################
 # Rebuilds the rpm metadata: starts from the target's repodata, drops the entries for the files
 # listed in <excludes> (one filename per line), merges in <new>/packages/*.rpm (already signed),
-# and signs repomd.xml. Prints the directory holding the new repodata/.
-rpm_metadata() { # <work> <new> <excludes>
+# and signs repomd.xml.
+# Arguments:
+#   <work dir> <new dir> <excludes file>
+# Outputs:
+#   The directory holding the new repodata/ on stdout.
+################################################################################
+repo__rpm_metadata() {
   local work=$1 new=$2 excludes=$3 old=$1/rpm-old have_old=false have_new=false href f
   mkdir -p "$old/repodata" "$new/packages"
-  if target_get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
+  if target__get rpm/repodata/repomd.xml "$old/repodata/repomd.xml"; then
     have_old=true
     while IFS= read -r href; do
-      target_get "rpm/$href" "$old/$href" || die "rpm/$href is referenced by repomd.xml but missing"
+      target__get "rpm/$href" "$old/$href" \
+        || log__fatal "rpm/$href is referenced by repomd.xml but missing"
     done < <(grep -o 'href="repodata/[^"]*"' "$old/repodata/repomd.xml" | cut -d'"' -f2)
     if [[ -s $excludes ]]; then
       local args=()
@@ -38,29 +51,45 @@ rpm_metadata() { # <work> <new> <excludes>
     result=$new
   fi
   rm -f "$result/repodata/repomd.xml.asc"
-  gpg --batch --armor --detach-sign -o "$result/repodata/repomd.xml.asc" "$result/repodata/repomd.xml"
+  gpg --batch --armor --detach-sign -o "$result/repodata/repomd.xml.asc" \
+    "$result/repodata/repomd.xml"
   echo "$result"
 }
 
+################################################################################
 # Writes the rpm repodata to the target: data files first, then the signature, then repomd.xml
 # last (it points at everything else), then removes repodata files it no longer references.
 # The signature and repomd.xml can't change together, so between the two writes dnf fails
 # closed on a mismatch instead of reading a repomd.xml that points at missing files.
-rpm_metadata_write() { # <dir holding repodata/>
+# Arguments:
+#   <dir holding repodata/>
+################################################################################
+repo__write_rpm_metadata() {
   local dir=$1 f
   for f in "$dir"/repodata/*; do
-    case ${f##*/} in repomd.xml | repomd.xml.asc) ;; *) target_put "$f" "rpm/repodata/${f##*/}" ;; esac
+    case ${f##*/} in
+      repomd.xml | repomd.xml.asc) ;;
+      *) target__put "$f" "rpm/repodata/${f##*/}" ;;
+    esac
   done
-  target_put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
-  target_put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
-  for f in $(target_ls rpm/repodata); do
-    [[ -e $dir/repodata/$f ]] || target_rm "rpm/repodata/$f"
+  target__put "$dir/repodata/repomd.xml.asc" rpm/repodata/repomd.xml.asc
+  target__put "$dir/repodata/repomd.xml" rpm/repodata/repomd.xml
+  for f in $(target__ls rpm/repodata); do
+    [[ -e $dir/repodata/$f ]] || target__rm "rpm/repodata/$f"
   done
 }
 
-# Keeps the stanzas of a Packages file whose Filename isn't in <excludes> (pool paths) and,
-# when <arch> is set, whose Architecture is <arch> or all.
-apt_filter() { # <excludes> <arch> < Packages
+################################################################################
+# Filters a Packages file: keeps the stanzas whose Filename isn't in the excludes file (pool
+# paths) and, when an arch is given, whose Architecture is that arch or all.
+# Arguments:
+#   <excludes file> <arch, or "">
+# Inputs:
+#   The Packages file on stdin.
+# Outputs:
+#   The kept stanzas on stdout.
+################################################################################
+repo__apt_filter() {
   awk -v ex="$1" -v arch="$2" '
     BEGIN { while ((getline l < ex) > 0) skip[l] = 1; RS = ""; ORS = "\n\n" }
     {
@@ -73,10 +102,16 @@ apt_filter() { # <excludes> <arch> < Packages
     }'
 }
 
+################################################################################
 # Rebuilds the apt metadata: per architecture, the target's Packages minus <excludes> (pool
 # paths, one per line) plus the stanzas for <new>/pool/**.deb; then Release, InRelease, and
-# Release.gpg. Prints the directory holding the new dists/.
-apt_metadata() { # <work> <new> <excludes>
+# Release.gpg.
+# Arguments:
+#   <work dir> <new dir> <excludes file>
+# Outputs:
+#   The directory holding the new dists/ on stdout.
+################################################################################
+repo__apt_metadata() {
   local work=$1 new=$2 excludes=$3 out=$1/apt-out arch
   local dist=$out/dists/$SUITE
   mkdir -p "$new/pool"
@@ -84,11 +119,11 @@ apt_metadata() { # <work> <new> <excludes>
   for arch in "${DEB_ARCHES[@]}"; do
     local bin=$dist/main/binary-$arch
     mkdir -p "$bin"
-    target_get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
+    target__get "deb/dists/$SUITE/main/binary-$arch/Packages" "$work/old.Packages.$arch" \
       || : > "$work/old.Packages.$arch"
     {
-      apt_filter "$excludes" "" < "$work/old.Packages.$arch"
-      apt_filter /dev/null "$arch" < "$work/new.Packages"
+      repo__apt_filter "$excludes" "" < "$work/old.Packages.$arch"
+      repo__apt_filter /dev/null "$arch" < "$work/new.Packages"
     } > "$bin/Packages"
     gzip -9nc "$bin/Packages" > "$bin/Packages.gz"
   done
@@ -101,40 +136,34 @@ apt_metadata() { # <work> <new> <excludes>
     -o APT::FTPArchive::Release::Components=main \
     release "dists/$SUITE") > "$work/Release"
   mv "$work/Release" "$dist/Release"
-  apt_sign "$dist"
+  repo__sign_apt "$dist"
   echo "$out"
 }
 
-apt_sign() { # <dist dir holding Release>
+################################################################################
+# Signs a Release file with the archive key: InRelease and Release.gpg beside it.
+# Arguments:
+#   <dist dir holding Release>
+################################################################################
+repo__sign_apt() {
   rm -f "$1/InRelease" "$1/Release.gpg"
   gpg --batch --clearsign -o "$1/InRelease" "$1/Release"
   gpg --batch --armor --detach-sign -o "$1/Release.gpg" "$1/Release"
 }
 
+################################################################################
 # Writes the apt metadata: Packages files first, then Release, Release.gpg, and InRelease.
-apt_metadata_write() { # <dir holding dists/>
+# Arguments:
+#   <dir holding dists/>
+################################################################################
+repo__write_apt_metadata() {
   local dist=$1/dists/$SUITE arch f
   for arch in "${DEB_ARCHES[@]}"; do
     for f in Packages Packages.gz; do
-      target_put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
+      target__put "$dist/main/binary-$arch/$f" "deb/dists/$SUITE/main/binary-$arch/$f"
     done
   done
   for f in Release Release.gpg InRelease; do
-    target_put "$dist/$f" "deb/dists/$SUITE/$f"
-  done
-}
-
-# Publishes keys/ (archive.asc, and during a rotation or after a compromise archive-next.asc,
-# archive-previous.asc, revoked-<fpr>.asc) and removes keys no longer there. Without a committed
-# keys/archive.asc (throwaway key), publishes the archive public key alone.
-keys_write() {
-  local f
-  if [[ ! -f $ROOT/keys/archive.asc ]]; then
-    target_put "$ARCHIVE_PUB" keys/archive.asc
-    return
-  fi
-  for f in "$ROOT"/keys/*.asc; do target_put "$f" "keys/${f##*/}"; done
-  for f in $(target_ls keys); do
-    [[ -e $ROOT/keys/$f ]] || target_rm "keys/$f"
+    target__put "$dist/$f" "deb/dists/$SUITE/$f"
   done
 }

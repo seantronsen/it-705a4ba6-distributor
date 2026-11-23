@@ -1,5 +1,5 @@
 # The config's publishers ($pubs), keyed by GitHub user ID, against a tag's push actors (input:
-# [{run, attempt, role, login, id, type}], from lib.sh's tag_push_actors).
+# [{run, attempt, role, login, id, type}], from github__tag_push_actors).
 
 # Whether GitHub user $id may publish $repo's releases. A username can be renamed and then
 # registered by someone else, an ID can't. No entry: no. An entry without `repos` (core

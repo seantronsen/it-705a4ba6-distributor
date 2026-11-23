@@ -6,16 +6,21 @@
 #   commit-state.sh [result.json|delta.json]...
 #
 # CI only: needs a checkout that can push, and the runner's GITHUB_* variables.
-source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/lib/github.sh"
 
-# A function, so bash has read all of it before the reset below rewrites this file.
+################################################################################
+# Records the results and pushes the state. A function, so bash has read all of it before the
+# reset below rewrites this file.
+# Arguments:
+#   [result.json|delta.json]...
+################################################################################
 main() {
   local attempt
   if [[ $# -eq 0 ]]; then
-    log 'Nothing to record.'
+    log__info 'Nothing to record.'
     return
   fi
-  cd "$ROOT"
+  cd "$ROOT" || exit 1
   git config user.name 'github-actions[bot]'
   git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
   for attempt in $(seq 1 3); do
@@ -25,14 +30,14 @@ main() {
     scripts/validate.sh state/state.schema.json state/state.json
     git add state/
     if git diff --cached --quiet; then
-      log 'State unchanged.'
+      log__info 'State unchanged.'
       return
     fi
-    git commit --quiet -m "state: $GITHUB_WORKFLOW $(run_url)"
+    git commit --quiet -m "state: $GITHUB_WORKFLOW $(github__run_url)"
     git push --quiet origin "HEAD:$GITHUB_REF_NAME" && return
-    log "Push failed (attempt $attempt); retrying on the latest state."
+    log__info "Push failed (attempt $attempt); retrying on the latest state."
   done
-  die "couldn't push the state after 3 attempts"
+  log__fatal "couldn't push the state after 3 attempts"
 }
 
 main "$@"

@@ -8,7 +8,7 @@
     {
       "customType": "regex",
       "description": "Commit-pinned script URLs annotated with a preceding '# renovate: ... currentValue=<tag>' comment",
-      "managerFilePatterns": ["/^scripts/lib\\.sh$/"],
+      "managerFilePatterns": ["/^scripts/lib/base\\.sh$/"],
       "matchStrings": [
         "#\\s*renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) currentValue=(?<currentValue>\\S+)\\s*\\n\\s*[A-Z_]+=https://raw\\.githubusercontent\\.com/[^/]+/[^/]+/(?<currentDigest>[0-9a-f]{40})/"
       ]

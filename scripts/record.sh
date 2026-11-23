@@ -8,45 +8,59 @@
 # fetched state so concurrent writers never overwrite each other.
 # issues: opens an issue per rejected release and per denied repo key, unless one is already
 # open. CI runs state inside the commit retry loop and issues once after it.
-source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/lib/base.sh"
+source "$(dirname "$0")/lib/github.sh"
+source "$(dirname "$0")/lib/state.sh"
 
-[[ $# -ge 2 ]] || die "usage: record.sh <state|issues|all> <result.json|delta.json>..."
+[[ $# -ge 2 ]] || log__fatal "usage: record.sh <state|issues|all> <result.json|delta.json>..."
 mode=$1
 shift
-case $mode in state | issues | all) ;; *) die "unknown mode: $mode (state, issues, or all)" ;; esac
+case $mode in
+  state | issues | all) ;;
+  *) log__fatal "unknown mode: $mode (state, issues, or all)" ;;
+esac
 
+################################################################################
+# Applies the result files to STATE: release entries first, then the package patches that
+# refer to them.
+# Arguments:
+#   <result.json|delta.json>...
+################################################################################
 update_state() {
-  # Release entries first, then the package patches that refer to them.
   local state f releases=() patches=()
-  state=$(state_json)
+  state=$(state__json)
   for f in "$@"; do
     if jq -e .key "$f" > /dev/null; then releases+=("$f"); else patches+=("$f"); fi
   done
   for f in "${releases[@]}" "${patches[@]}"; do
-    state=$(jql -c --slurpfile d "$f" 'import "record" as record; record::apply($d[0])' \
+    state=$(base__jq -c --slurpfile d "$f" 'import "record" as record; record::apply($d[0])' \
       <<< "$state")
   done
 
   mkdir -p "$(dirname "$STATE")"
   jq -S . <<< "$state" > "$STATE.tmp"
   mv "$STATE.tmp" "$STATE"
-  log "record: updated $STATE"
+  log__info "record: updated $STATE"
 }
 
+################################################################################
+# Opens an issue per rejected release, unless one is open, and one per denied repo key and
+# wave: a package is denied only once, so a later wave for the same key gets its own issue.
+# Arguments:
+#   <result.json|delta.json>...
+################################################################################
 file_issues() {
-  local f group
+  local f group key
   for f in "$@"; do
     jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
-    issue_ensure "Rejected release: $(jq -r .key "$f")" rejected-release \
-      "$(jql -r 'import "record" as record; record::rejection_body' "$f")"
+    github__ensure_issue "Rejected release: $(jq -r .key "$f")" rejected-release \
+      "$(base__jq -r 'import "record" as record; record::rejection_body' "$f")"
   done
-  # One issue per denied repo key and wave, across the rpm and deb deltas. A package is denied
-  # only once, so a later wave for the same key gets its own issue.
   while IFS= read -r group; do
-    issue_create "Denied repo key: $(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group") ($(date -u +%F))" \
-      denied-repo-key \
-      "$(jql -r 'import "record" as record; record::denial_body' <<< "$group")"
-  done < <(jql -c -s 'import "record" as record; record::denial_groups' "$@")
+    key=$(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group")
+    github__create_issue "Denied repo key: $key ($(date -u +%F))" denied-repo-key \
+      "$(base__jq -r 'import "record" as record; record::denial_body' <<< "$group")"
+  done < <(base__jq -c -s 'import "record" as record; record::denial_groups' "$@")
 }
 
 [[ $mode == state || $mode == all ]] && update_state "$@"
