@@ -13,9 +13,7 @@ KEYRING=openchami-keyring
 
 # The next version: the latest openchami-keyring@<version> in state, patch bumped.
 next_version() {
-  state_json | jql -r --arg n "$KEYRING@" 'include "lib";
-    [keys[] | select(startswith($n)) | ltrimstr($n) | semver]
-    | (max // [1, 0, -1]) | "\(.[0]).\(.[1]).\(.[2] + 1)"'
+  state_json | jql -r --arg n "$KEYRING" 'import "keyring" as keyring; keyring::next_version($n)'
 }
 
 # Every key to package, as one armored file.

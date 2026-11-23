@@ -35,8 +35,8 @@ now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 run_url() { echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"; }
 
-# jq with scripts/lib.jq available through `include "lib";`.
-jql() { jq -L "$ROOT/scripts" "$@"; }
+# jq with the modules in scripts/jq/ available, e.g. `import "state" as state;`.
+jql() { jq -L "$ROOT/scripts/jq" "$@"; }
 
 # Whether a config setting is set.
 config_has() { # <jq path>

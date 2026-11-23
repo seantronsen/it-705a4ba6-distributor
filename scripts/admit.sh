@@ -50,16 +50,10 @@ check_publisher() {
   [[ $(jq length <<< "$actors") -gt 0 ]] \
     || finish rejected "no push run found for tag $tag, so its publisher can't be checked"
   # Usernames are labels only; flag a listed ID whose username has since changed.
-  jq -r --argjson p "$pubs" 'unique_by(.id)[] | . as $x | $p["\($x.id)"] // empty
-    | select((.username | ascii_downcase) != (($x.login // "") | ascii_downcase))
-    | "warning: publisher \($x.id) is listed as \(.username) but is now \($x.login)"' \
+  jql -r --argjson p "$pubs" 'import "publishers" as publishers; publishers::renamed($p)' \
     <<< "$actors" | while read -r line; do log "$line"; done
-  mapfile -t reasons < <(jql -r --argjson p "$pubs" --arg repo "$repo" 'include "lib";
-    map(select(may_publish($p; .id; $repo) | not)) | group_by(.id)[]
-    | "\(.[0].login // "unknown") (id \(.[0].id // "none"), \(.[0].type // "unknown")) may not"
-      + " publish \($repo) (\(map(.role) | unique | join(", ")):"
-      + " \(map("run \(.run) attempt \(.attempt)") | unique | join(", ")))"' \
-    <<< "$actors")
+  mapfile -t reasons < <(jql -r --argjson p "$pubs" --arg repo "$repo" \
+    'import "publishers" as publishers; publishers::rejections($p; $repo)' <<< "$actors")
   [[ ${#reasons[@]} -eq 0 ]] || finish rejected "${reasons[@]}"
 }
 
@@ -93,9 +87,8 @@ verify_chain() {
 check_denied_key() {
   local repo_key denied
   repo_key=$(jq -r .repo_key "$result")
-  denied=$(jq -r --arg repo "$repo" --arg f "$repo_key" \
-    '(.[$repo].deny // [])[] | select(.fingerprint == $f) | .reason // "no reason given"' \
-    <<< "$cfg" | head -1)
+  denied=$(jql -r --arg repo "$repo" --arg f "$repo_key" \
+    'import "deny" as deny; deny::reason($repo; $f)' <<< "$cfg")
   [[ -z $denied ]] || finish rejected "repo key $repo_key is denied: $denied"
 }
 
@@ -147,7 +140,8 @@ read_packages() {
 
 # Skips the release quietly when any package has a prerelease version.
 check_prerelease() {
-  if jq -e 'any(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+[~-]"))' <<< "$infos" > /dev/null; then
+  if jql -e 'import "version" as version; any(.version | version::is_prerelease)' <<< "$infos" \
+    > /dev/null; then
     rm -rf "$out/files"
     finish skipped "prerelease version"
   fi
@@ -155,7 +149,7 @@ check_prerelease() {
 
 # Version reasons, one per line: other versions than major.minor.patch.
 version_reasons() {
-  jq -r '.[] | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$") | not)
+  jql -r 'import "version" as version; .[] | select(.version | version::is_release | not)
     | "\(.filename): version \(.version) isn'"'"'t major.minor.patch"' <<< "$infos"
 }
 
@@ -163,43 +157,8 @@ version_reasons() {
 # its reasons ([] when it passes). State goes to jq on stdin: it outgrows the command-line
 # argument limit.
 apply_package_rules() {
-  state_json | jql -c --arg repo "$repo" --argjson cfg "$cfg" --argjson infos "$infos" '
-    include "lib";
-    def short($r): $r | split("/") | last | ascii_downcase;
-    def claims($n; $s): $n == $s or ($n | startswith($s + "-"));
-    . as $state
-    | $infos
-    | ($repo | short(.)) as $me
-    | ($cfg[$repo].allow // []) as $allow
-    | [$cfg | to_entries[] | select(.key != $repo) | {name: .key} + .value] as $others
-    # Historical owners: the repo that first published each name, from state.
-    | ([$state | to_entries[] | .key as $k | (.value.packages // [])[] | {name, repo: ($k | repo_of)}]
-       | group_by(.name) | map({key: .[0].name, value: (map(.repo) | unique)}) | from_entries) as $owners
-    | ($state | [to_entries[] | (.value.packages // [])[]]) as $known
-    | group_by([.format, .name, .version, .arch]) as $groups
-    | map(. as $p
-        | ($owners[$p.name] // []) as $o
-        | [ (if ($o | length) > 0 then
-               (if ($o | index($repo)) == null then "\($p.filename): \($p.name) is already published by \($o | join(", "))" else empty end)
-             elif ($allow | index($p.name)) == null and (claims($p.name; $me) | not) then
-               "\($p.filename): \($p.name) is not \($me) or \($me)-* and not in allow"
-             elif any($others[]; ((.allow // []) | index($p.name)) != null) then
-               "\($p.filename): \($p.name) is in another repo'"'"'s allow"
-             elif any($others[]; (short(.name) | length) > ($me | length) and claims($p.name; short(.name))) then
-               "\($p.filename): \($p.name) belongs to a repo with a longer matching name"
-             else empty end),
-            (if any($groups[]; length > 1 and .[0].format == $p.format and .[0].name == $p.name
-                 and .[0].version == $p.version and .[0].arch == $p.arch)
-             then "\($p.filename): duplicate \($p.format) package \($p.name) \($p.version) \($p.arch) in the release"
-             else empty end),
-            # A version is admitted once; a fix ships as a new patch version.
-            (if any($known[]; .format == $p.format and .name == $p.name and .version == $p.version
-                 and .arch == $p.arch)
-             then "\($p.filename): \($p.name) \($p.version) \($p.arch) was already admitted; ship a new patch version"
-             else empty end)
-          ] as $why
-        | $p + {reasons: ($why | unique)})
-  '
+  state_json | jql -c --arg repo "$repo" --argjson cfg "$cfg" --argjson infos "$infos" \
+    'import "admit" as admit; . as $state | $infos | admit::check($state; $cfg; $repo)'
 }
 
 # Rejects the release on any version or package rule; else admits its packages.

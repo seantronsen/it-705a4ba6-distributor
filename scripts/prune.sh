@@ -24,15 +24,16 @@ state=$(state_json)
 # [{release, repo, format, name, filename, fingerprint}]
 denied_packages() {
   jql -c --argjson cfg "$cfg" --arg fmt "$fmt" \
-    'include "lib"; denied_packages($cfg) | map(select(.format == $fmt))' <<< "$state"
+    'import "deny" as deny; deny::packages($cfg) | map(select(.format == $fmt))' <<< "$state"
 }
 
 # This format's other published packages that retention drops, as JSON.
 retention_packages() { # <denied>
-  jql -c --argjson cfg "$cfg" --arg fmt "$fmt" --argjson denied "$1" 'include "lib";
-    published_packages | map(select(.format == $fmt)
+  jql -c --argjson cfg "$cfg" --arg fmt "$fmt" --argjson denied "$1" '
+    import "state" as state; import "retention" as retention;
+    state::published_packages | map(select(.format == $fmt)
       | select(. as $p | $denied | any(.release == $p.release and .filename == $p.filename) | not))
-    | retention($cfg) | map(select(.keep | not))' <<< "$state"
+    | retention::apply($cfg) | map(select(.keep | not))' <<< "$state"
 }
 
 # Writes the delta for record: a pruned patch per package, and the denied ones for their issues.
@@ -49,10 +50,8 @@ write_delta() { # <pruned> <denied>
 orphan_paths() {
   local pkgdir
   if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-  comm -23 <(target_find "$pkgdir" | sort) <(jql -r --arg fmt "$fmt" '
-    include "lib"; published_packages[] | select(.format == $fmt)
-    | if $fmt == "rpm" then "rpm/packages/\(.filename)"
-      else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' <<< "$state" | sort)
+  comm -23 <(target_find "$pkgdir" | sort) <(jql -r --arg fmt "$fmt" \
+    'import "prune" as prune; prune::published_paths($fmt)' <<< "$state" | sort)
 }
 
 # The files to leave out of the metadata, one per line: rpm file names, or deb paths under deb/.

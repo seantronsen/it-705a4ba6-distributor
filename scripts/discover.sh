@@ -12,11 +12,8 @@ cfg=$(config_get .repos)
 new=$(mktemp)
 while IFS= read -r repo; do
   releases=$(releases_list "$repo")
-  state_json | jq -c --arg repo "$repo" --argjson rel "$releases" '
-    . as $state
-    | $rel[] | select((.draft or .prerelease) | not)
-    | {repo: $repo, tag: .tag_name, published_at}
-    | select($state["\(.repo)@\(.tag)"] == null)' >> "$new"
+  state_json | jql -c --arg repo "$repo" --argjson rel "$releases" \
+    'import "discover" as discover; discover::new($repo; $rel)' >> "$new"
 done < <(jq -r 'keys[]' <<< "$cfg")
 
 log "discover: $(wc -l < "$new") new release(s), admitting at most $MAX_RELEASES"

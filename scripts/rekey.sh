@@ -14,8 +14,9 @@ BATCH=50
 
 # Published rpms not signed with the current key, as [{release, filename}].
 rpms_to_resign() {
-  state_json | jql -c --arg fpr "$ARCHIVE_FPR" 'include "lib";
-    published_packages | map(select(.format == "rpm" and .signed_with != $fpr) | {release, filename})'
+  state_json | jql -c --arg fpr "$ARCHIVE_FPR" 'import "state" as state;
+    state::published_packages
+    | map(select(.format == "rpm" and .signed_with != $fpr) | {release, filename})'
 }
 
 # Downloads, re-signs, and re-uploads one batch, then rewrites the metadata over it.

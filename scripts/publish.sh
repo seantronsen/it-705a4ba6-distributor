@@ -20,10 +20,8 @@ delta=$out/delta-$fmt.json
 new='[]'
 for d in "$@"; do
   d=$(cd "$d" && pwd)
-  new=$(jq -c --arg fmt "$fmt" --arg d "$d" --slurpfile r "$d/result.json" '
-    . + [$r[0] | select(.status == "published") | .key as $k
-         | .packages[] | select(.format == $fmt)
-         | . + {release: $k, path: "\($d)/\(.path)"}]' <<< "$new")
+  new=$(jql -c --arg fmt "$fmt" --arg d "$d" --slurpfile r "$d/result.json" \
+    'import "publish" as publish; . + publish::admitted($r[0]; $fmt; $d)' <<< "$new")
 done
 
 if [[ $(jq length <<< "$new") -eq 0 ]]; then

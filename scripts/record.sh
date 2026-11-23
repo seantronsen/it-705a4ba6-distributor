@@ -23,19 +23,8 @@ update_state() {
     if jq -e .key "$f" > /dev/null; then releases+=("$f"); else patches+=("$f"); fi
   done
   for f in "${releases[@]}" "${patches[@]}"; do
-    state=$(jq -c --slurpfile d "$f" '
-      $d[0] as $d
-      | if $d.key then
-          .[$d.key] = ($d | {status, at, run}
-            + (if .status == "published" then {repo_key, packages: [.packages[] | del(.path)]}
-               else {reasons} end))
-        else
-          reduce $d.patches[] as $p (.;
-            if .[$p.release] == null then .
-            else .[$p.release].packages |= map(
-              if .filename == $p.filename then . + ($p | del(.release, .filename)) else . end)
-            end)
-        end' <<< "$state")
+    state=$(jql -c --slurpfile d "$f" 'import "record" as record; record::apply($d[0])' \
+      <<< "$state")
   done
 
   mkdir -p "$(dirname "$STATE")"
@@ -48,19 +37,16 @@ file_issues() {
   local f group
   for f in "$@"; do
     jq -e '.key and .status == "rejected"' "$f" > /dev/null || continue
-    issue_ensure "Rejected release: $(jq -r .key "$f")" rejected-release "$(jq -r '
-      "Release `\(.key)` was rejected, so none of its packages were published.\n\n"
-      + (.reasons | map("- \(.)") | join("\n"))
-      + "\n\nRun: \(.run)\n\nFix the problem and publish a new patch release; this release won'"'"'t be processed again."' "$f")"
+    issue_ensure "Rejected release: $(jq -r .key "$f")" rejected-release \
+      "$(jql -r 'import "record" as record; record::rejection_body' "$f")"
   done
   # One issue per denied repo key and wave, across the rpm and deb deltas. A package is denied
   # only once, so a later wave for the same key gets its own issue.
   while IFS= read -r group; do
     issue_create "Denied repo key: $(jq -r '.[0] | "\(.repo) \(.fingerprint)"' <<< "$group") ($(date -u +%F))" \
       denied-repo-key \
-      "$(jq -r '"These packages were admitted with a denied repo key and have been unpublished:\n\n"
-        + (map("- `\(.filename)` (\(.release))") | join("\n"))' <<< "$group")"
-  done < <(jq -c -s '[.[].denied // [] | .[]] | group_by([.repo, .fingerprint])[]' "$@")
+      "$(jql -r 'import "record" as record; record::denial_body' <<< "$group")"
+  done < <(jql -c -s 'import "record" as record; record::denial_groups' "$@")
 }
 
 [[ $mode == state || $mode == all ]] && update_state "$@"
