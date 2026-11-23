@@ -33,7 +33,7 @@ main() {
     git fetch --quiet origin "$GITHUB_REF_NAME"
     git reset --quiet --hard FETCH_HEAD
     scripts/record.sh state "$@"
-    scripts/validate.sh state/state.schema.json state/state.json
+    scripts/validate.sh schemas/state.schema.json state/state.json
     git add state/
     if git diff --cached --quiet; then
       log__info 'State unchanged.'

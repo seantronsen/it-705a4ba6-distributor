@@ -1,6 +1,6 @@
 ---
-# yaml-language-server: $schema=repos.schema.json
-# config/repos.yaml
+# yaml-language-server: $schema=../schemas/distributor.schema.json
+# config/distributor.yaml
 #
 # =============================================================================
 # Distributor - Configuration
@@ -12,7 +12,7 @@
 #
 # A push that changes this file triggers a poll right away, so a new repo, a new
 # publisher, or a deny takes effect within minutes. Poll first validates the
-# file against repos.schema.json and fails the whole run on any problem, before
+# file against schemas/distributor.schema.json and fails the whole run on any problem, before
 # admitting anything: a bad config never rejects a release, since a rejection is
 # permanent.
 #

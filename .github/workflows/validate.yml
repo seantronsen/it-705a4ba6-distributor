@@ -1,4 +1,4 @@
-# Validates config/repos.yaml and state/state.json against their schemas on every PR, so main
+# Validates config/distributor.yaml and state/state.json against their schemas on every PR, so main
 # only ever gets a valid config and state (make it a required status check). Poll validates the
 # config again before reading it, and record the state before committing it.
 #
@@ -23,6 +23,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate the config
-        run: scripts/validate.sh config/repos.schema.json config/repos.yaml
+        run: scripts/validate.sh schemas/distributor.schema.json config/distributor.yaml
       - name: Validate the state
-        run: scripts/validate.sh state/state.schema.json state/state.json
+        run: scripts/validate.sh schemas/state.schema.json state/state.json

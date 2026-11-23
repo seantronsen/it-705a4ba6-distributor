@@ -1,7 +1,7 @@
 # shellcheck shell=bash
-# The config: config/repos.yaml, checked against config/repos.schema.json. Read once, with each
-# repo's omitted settings filled from the schema's defaults, into CONFIG_JSON (exported, so child
-# processes such as publish's parallel uploads reuse it).
+# The config: config/distributor.yaml, checked against schemas/distributor.schema.json. Read
+# once, with each repo's omitted settings filled from the schema's defaults, into CONFIG_JSON
+# (exported, so child processes such as publish's parallel uploads reuse it).
 
 [[ -n ${_LIB_CONFIG_SH:-} ]] && return 0
 _LIB_CONFIG_SH=1
@@ -10,7 +10,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 
 if [[ -z ${CONFIG_JSON:-} ]]; then
   CONFIG_JSON=$(yq -o=json -I=0 . "$CONFIG" \
-    | base__jq -c --slurpfile s "$ROOT/config/repos.schema.json" \
+    | base__jq -c --slurpfile s "$ROOT/schemas/distributor.schema.json" \
       'import "config" as config; config::fill_repo_defaults($s[0])') \
     || log__fatal "can't read $CONFIG"
   export CONFIG_JSON

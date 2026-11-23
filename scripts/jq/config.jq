@@ -1,4 +1,4 @@
-# config/repos.yaml (input, as JSON).
+# config/distributor.yaml (input, as JSON).
 
 # Fills each repo's omitted settings with their defaults from the schema ($schema).
 def fill_repo_defaults($schema):

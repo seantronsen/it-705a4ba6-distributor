@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "repos.schema.json",
-  "title": "Distributor config (config/repos.yaml)",
-  "description": "Who may publish, and the service repos to poll. See the comments in config/repos.yaml.",
+  "$id": "distributor.schema.json",
+  "title": "Distributor config (config/distributor.yaml)",
+  "description": "Who may publish, and the service repos to poll. See the comments in config/distributor.yaml.",
   "type": "object",
   "additionalProperties": false,
   "required": ["target", "architectures", "max_releases", "archive_key", "publishers", "repos"],

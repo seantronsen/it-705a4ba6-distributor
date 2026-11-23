@@ -17,7 +17,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # shellcheck disable=SC2034 # used by the scripts that source this
 {
-  CONFIG=$ROOT/config/repos.yaml
+  CONFIG=$ROOT/config/distributor.yaml
   STATE=$ROOT/state/state.json
   SUITE=stable
   # github-actions' trust-chain check, pinned by commit; Renovate updates the tag and commit.

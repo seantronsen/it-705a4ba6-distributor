@@ -7,7 +7,7 @@ on:
   # Config changes (a new repo, a deny) take effect right away.
   push:
     paths:
-      - config/repos.yaml
+      - config/distributor.yaml
   workflow_dispatch:
 
 # Shared by every workflow that writes the target or state; a running one is never cancelled.
@@ -41,7 +41,7 @@ jobs:
           ref: ${{ steps.sha.outputs.sha }}
           persist-credentials: false
       - name: Validate the config
-        run: scripts/validate.sh config/repos.schema.json config/repos.yaml
+        run: scripts/validate.sh schemas/distributor.schema.json config/distributor.yaml
 
   # Fails the run on an archive key problem (expiring, or not keys/archive.asc) before anything is
   # published, and keeps the key issues in step.
