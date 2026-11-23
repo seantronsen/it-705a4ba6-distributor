@@ -1,20 +1,18 @@
 # admit.sh's package rules.
 
+import "repo" as repo;
 import "state" as state;
-
-def short($r): $r | split("/") | last | ascii_downcase;
-def claims($n; $s): $n == $s or ($n | startswith($s + "-"));
 
 # The release's packages (input: [{format, name, version, arch, filename, ...}]) with the name,
 # duplicate, and already-admitted rules applied: each gets `reasons` ([] when it passes).
 # $state: state/state.json; $cfg: the repos, keyed by name; $repo: the release's repo.
-def package_rules_apply($state; $cfg; $repo):
-  short($repo) as $me
+def add_package_rejection_reasons($state; $cfg; $repo):
+  repo::short_name($repo) as $me
   | $cfg[$repo].allow as $allow
   | [$cfg | to_entries[] | select(.key != $repo) | {name: .key} + .value] as $others
   # Historical owners: the repos that published each name, from state.
-  | ($state | state::owners) as $owners
-  | ($state | state::known_packages) as $known
+  | ($state | state::package_owners) as $owners
+  | [$state[].packages[]] as $known
   | group_by([.format, .name, .version, .arch]) as $groups
   | map(. as $p
       | ($owners[$p.name] // []) as $o
@@ -22,12 +20,13 @@ def package_rules_apply($state; $cfg; $repo):
              (if ($o | index($repo)) == null
               then "\($p.filename): \($p.name) is already published by \($o | join(", "))"
               else empty end)
-           elif ($allow | index($p.name)) == null and (claims($p.name; $me) | not) then
+           elif ($allow | index($p.name)) == null
+               and (repo::is_package_named_after($repo; $p.name) | not) then
              "\($p.filename): \($p.name) is not \($me) or \($me)-* and not in allow"
            elif any($others[]; (.allow | index($p.name)) != null) then
              "\($p.filename): \($p.name) is in another repo's allow"
-           elif any($others[]; (short(.name) | length) > ($me | length)
-               and claims($p.name; short(.name))) then
+           elif any($others[]; (repo::short_name(.name) | length) > ($me | length)
+               and repo::is_package_named_after(.name; $p.name)) then
              "\($p.filename): \($p.name) belongs to a repo with a longer matching name"
            else empty end),
           (if any($groups[]; length > 1 and .[0].format == $p.format and .[0].name == $p.name

@@ -1,7 +1,7 @@
 # config/repos.yaml (input, as JSON).
 
 # Fills each repo's omitted settings with their defaults from the schema ($schema).
-def with_defaults($schema):
+def fill_repo_defaults($schema):
   ($schema.properties.repos.additionalProperties.properties
     | with_entries(select(.value | has("default")) | .value |= .default)) as $d
   | .repos |= map_values($d + .);

@@ -8,7 +8,7 @@ import "version" as version;
 def apply($cfg):
   group_by([.name, .arch])
   | map(
-      map(. + {v: (.version | version::parse)})
+      map(. + {v: (.version | version::parse_semver)})
       | (map(.v[0]) | max) as $n
       | group_by(.v[0:2])
       | map((map(.v[2]) | max) as $latest | map(. + {latest: (.v[2] == $latest)}))
