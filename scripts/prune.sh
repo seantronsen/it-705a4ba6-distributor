@@ -16,35 +16,92 @@ fmt=$1 out=$2
 [[ $fmt == rpm || $fmt == deb ]] || die "unknown format: $fmt"
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
-delta=$out/prune-$fmt.json
 
 cfg=$(config_json)
 state=$(state_json)
 
-denied=$(jql -c --argjson cfg "$cfg" --arg fmt "$fmt" \
-  'include "lib"; denied_packages($cfg) | map(select(.format == $fmt))' <<< "$state")
-decisions=$(jql -c --argjson cfg "$cfg" --arg fmt "$fmt" --argjson denied "$denied" 'include "lib";
-  published_packages | map(select(.format == $fmt)
-    | select(. as $p | $denied | any(.release == $p.release and .filename == $p.filename) | not))
-  | retention($cfg)' <<< "$state")
-pruned=$(jq -c '[.[] | select(.keep | not)]' <<< "$decisions")
+# This format's published packages admitted with a denied repo key, as JSON:
+# [{release, repo, format, name, filename, fingerprint}]
+denied_packages() {
+  jql -c --argjson cfg "$cfg" --arg fmt "$fmt" \
+    'include "lib"; denied_packages($cfg) | map(select(.format == $fmt))' <<< "$state"
+}
 
-jq -n --arg fmt "$fmt" --argjson pruned "$pruned" --argjson denied "$denied" '
-  {format: $fmt,
-   patches: ([$pruned[] | {release, filename, status: "pruned", reason: "retention"}]
-     + [$denied[] | {release, filename, status: "pruned", reason: "denied repo key \(.fingerprint)"}]),
-   denied: $denied}' > "$delta"
+# This format's other published packages that retention drops, as JSON.
+retention_packages() { # <denied>
+  jql -c --argjson cfg "$cfg" --arg fmt "$fmt" --argjson denied "$1" 'include "lib";
+    published_packages | map(select(.format == $fmt)
+      | select(. as $p | $denied | any(.release == $p.release and .filename == $p.filename) | not))
+    | retention($cfg) | map(select(.keep | not))' <<< "$state"
+}
 
+# Writes the delta for record: a pruned patch per package, and the denied ones for their issues.
+write_delta() { # <pruned> <denied>
+  jq -n --arg fmt "$fmt" --argjson pruned "$1" --argjson denied "$2" '
+    {format: $fmt,
+     patches: ([$pruned[] | {release, filename, status: "pruned", reason: "retention"}]
+       + [$denied[]
+          | {release, filename, status: "pruned", reason: "denied repo key \(.fingerprint)"}]),
+     denied: $denied}' > "$out/prune-$fmt.json"
+}
+
+# Package files on the target that state doesn't list as published, one path per line.
+orphan_paths() {
+  local pkgdir
+  if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
+  comm -23 <(target_find "$pkgdir" | sort) <(jql -r --arg fmt "$fmt" '
+    include "lib"; published_packages[] | select(.format == $fmt)
+    | if $fmt == "rpm" then "rpm/packages/\(.filename)"
+      else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' <<< "$state" | sort)
+}
+
+# The files to leave out of the metadata, one per line: rpm file names, or deb paths under deb/.
+excludes() { # <remove> [orphan path]...
+  local remove=$1 name filename f
+  shift
+  while IFS=$'\t' read -r name filename; do
+    if [[ $fmt == rpm ]]; then
+      echo "$filename"
+    else
+      f=$(package_path deb "$name" "$filename")
+      echo "${f#*/}"
+    fi
+  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
+  for f in "$@"; do
+    if [[ $fmt == rpm ]]; then echo "${f##*/}"; else echo "${f#deb/}"; fi
+  done
+}
+
+# Rewrites the repository metadata without the excluded files.
+rewrite_metadata() { # <excludes file>
+  local work meta
+  work=$(mktemp -d)
+  if [[ $fmt == rpm ]]; then
+    meta=$(rpm_metadata "$work" "$work/new" "$1")
+    rpm_metadata_write "$meta"
+  else
+    meta=$(apt_metadata "$work" "$work/new" "$1")
+    apt_metadata_write "$meta"
+  fi
+}
+
+# Deletes the removed packages' files and the orphans from the target.
+delete_files() { # <remove> [orphan path]...
+  local remove=$1 name filename f
+  shift
+  while IFS=$'\t' read -r name filename; do
+    target_rm "$(package_path "$fmt" "$name" "$filename")"
+  done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
+  for f in "$@"; do target_rm "$f"; done
+}
+
+denied=$(denied_packages)
+pruned=$(retention_packages "$denied")
+write_delta "$pruned" "$denied"
 remove=$(jq -c -s 'add' <<< "$pruned $denied")
 
-# Orphans: package files on the target that state doesn't list as published.
 target_init
-if [[ $fmt == rpm ]]; then pkgdir=rpm/packages; else pkgdir=deb/pool; fi
-mapfile -t orphans < <(comm -23 <(target_find "$pkgdir" | sort) <(jql -r --arg fmt "$fmt" '
-  include "lib"; published_packages[] | select(.format == $fmt)
-  | if $fmt == "rpm" then "rpm/packages/\(.filename)"
-    else "deb/pool/main/\(.name[0:1])/\(.name)/\(.filename)" end' <<< "$state" | sort))
-
+mapfile -t orphans < <(orphan_paths)
 if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
   log "prune $fmt: nothing to remove"
   exit 0
@@ -53,28 +110,10 @@ log "prune $fmt: $(jq length <<< "$pruned") by retention, $(jq length <<< "$deni
   "repo key, ${#orphans[@]} not in state"
 
 archive_key_init
-
-work=$(mktemp -d)
-excludes=$work/excludes
-while IFS=$'\t' read -r name filename; do
-  if [[ $fmt == rpm ]]; then echo "$filename"; else rel=$(package_path deb "$name" "$filename"); echo "${rel#*/}"; fi
-done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove") > "$excludes"
-for f in "${orphans[@]}"; do
-  if [[ $fmt == rpm ]]; then echo "${f##*/}"; else echo "${f#deb/}"; fi
-done >> "$excludes"
-
-if [[ $fmt == rpm ]]; then
-  meta=$(rpm_metadata "$work" "$work/new" "$excludes")
-  rpm_metadata_write "$meta"
-else
-  meta=$(apt_metadata "$work" "$work/new" "$excludes")
-  apt_metadata_write "$meta"
-fi
-
+excludes_file=$(mktemp)
+excludes "$remove" "${orphans[@]}" > "$excludes_file"
 # Metadata first, then deletes, so metadata never points at a missing file.
-while IFS=$'\t' read -r name filename; do
-  target_rm "$(package_path "$fmt" "$name" "$filename")"
-done < <(jq -r '.[] | [.name, .filename] | @tsv' <<< "$remove")
-for f in "${orphans[@]}"; do target_rm "$f"; done
+rewrite_metadata "$excludes_file"
+delete_files "$remove" "${orphans[@]}"
 
 log "prune $fmt: done ($TARGET)"
