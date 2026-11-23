@@ -21,7 +21,6 @@ rpms_signed_with() {
   repo=$(settings__get ".repos.$role.remote")
   old=$(keys__fpr archive)
   tmp=$(mktemp -d)
-  s3__use > /dev/null
   crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: rpm signed with the old key" rpms_signed_with "$repo@v1.0.0" "$old"

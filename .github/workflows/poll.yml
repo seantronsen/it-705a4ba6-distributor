@@ -64,7 +64,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
           ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
-        run: PUBLISH_DIR=$RUNNER_TEMP/target scripts/check-keys.sh
+        run: scripts/check-keys.sh
 
   discover:
     needs: [config, keys]

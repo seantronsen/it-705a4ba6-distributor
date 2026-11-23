@@ -4,7 +4,7 @@
 #
 #   keyring.sh <outdir>
 #
-# Packages every public key in keys/ (the throwaway archive key without keys/archive.asc) with
+# Packages every public key in keys/ (the archive public key without keys/archive.asc) with
 # nfpm, at the latest keyring version in state with the patch bumped (1.0.0 first). Writes
 # <outdir>/result.json and <outdir>/files/.
 source "$(dirname "$0")/lib/base.sh"
@@ -12,7 +12,6 @@ source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/keys.sh"
 source "$(dirname "$0")/lib/package.sh"
 source "$(dirname "$0")/lib/state.sh"
-source "$(dirname "$0")/lib/target.sh"
 
 KEYRING=openchami-keyring
 
@@ -27,7 +26,7 @@ next_version() {
 }
 
 ################################################################################
-# Exports every key to package (keys/, or the throwaway archive key without keys/archive.asc)
+# Exports every key to package (keys/, or the archive public key without keys/archive.asc)
 # into one armored file.
 # Arguments:
 #   <dest>
@@ -62,7 +61,6 @@ write_result() {
 mkdir -p "$1/files"
 out=$(cd "$1" && pwd)
 
-target__init
 keys__init_archive
 version=$(next_version)
 mkdir -p "$ROOT/keyring/build"

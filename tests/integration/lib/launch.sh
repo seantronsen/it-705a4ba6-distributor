@@ -1,7 +1,8 @@
 # shellcheck shell=bash
-# The host side of a run, shared by ci/run.sh and distro/run.sh: checks the host and the
-# configuration, snapshots the code under test, and runs one suite in a transient tools
-# container, which gets the resolved settings as a file and the GitHub token on stdin.
+# The host side of a run, shared by ci/run.sh and s3/run.sh: checks the host and the
+# configuration, sets the test bucket's credentials as the distributor's secrets, snapshots the
+# code under test, and runs one suite in a transient tools container, which gets the resolved
+# settings as a file and the GitHub token on stdin.
 
 [[ -n ${_IT_LAUNCH_SH:-} ]] && return 0
 _IT_LAUNCH_SH=1
@@ -279,6 +280,61 @@ launch__cleanup() {
 }
 
 ################################################################################
+# One of the test bucket's credentials: from the credentials file s3/init-aws.sh writes when
+# there is one, else the environment.
+# Arguments:
+#   Variable name (AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY).
+# Outputs:
+#   The value on stdout, empty when missing.
+################################################################################
+launch__s3_credential() {
+  local field=${1#AWS_} file
+  file=$(config__file_state_s3_credentials)
+  # Never falling back to the environment when the file exists: it may hold an admin's.
+  if [[ -f $file ]]; then
+    jq -r ".${field,,} // empty" "$file"
+  else
+    printf '%s' "${!1:-}"
+  fi
+}
+
+################################################################################
+# Checks the test bucket's settings and credentials are there. Reports every missing one.
+# Returns:
+#   0, or 1 when any is missing.
+################################################################################
+launch__check_s3() {
+  local name failed=false
+  for name in .s3.bucket .s3.region .s3.url; do
+    config__get "$name" > /dev/null || failed=true
+  done
+  for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+    if [[ -z $(launch__s3_credential "$name") ]]; then
+      log__error "needs $name (the test bucket's credentials): run s3/init-aws.sh"
+      failed=true
+    fi
+  done
+  ! $failed
+}
+
+################################################################################
+# Sets the test bucket's credentials as the distributor's secrets. Secrets reach gh on stdin
+# only; the tools container never sees them.
+# Returns:
+#   0, or 1 when a secret wasn't set.
+################################################################################
+launch__set_s3_secrets() {
+  local repo name
+  repo=$(config__get .repos.distributor.remote) || return 1
+  for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+    if ! launch__s3_credential "$name" | gh secret set "$name" -R "$repo"; then
+      log__error "can't set $name on $repo"
+      return 1
+    fi
+  done
+}
+
+################################################################################
 # Runs one suite: the bats files under <suite>/cases in a transient tools container, after
 # checking everything the run needs and reporting every problem at once. Results (TAP) go to
 # stdout and <output_dir>/<run id>/report.tap, next to settings.json and artifacts/.
@@ -316,6 +372,7 @@ launch__run() {
   token=$(launch__token) || failed=true
   engine=$(launch__engine $socket) || failed=true
   launch__check_repos || failed=true
+  launch__check_s3 || failed=true
   image=$(config__get .containers.images.tools) || failed=true
   out=$(config__get .output_dir) || failed=true
   out=${out/#\~/$HOME}/$id
@@ -327,6 +384,7 @@ launch__run() {
     log__error "nothing was run: fix the above first"
     return 1
   fi
+  launch__set_s3_secrets || return 1
   # shellcheck disable=SC2064 # the values are fixed now
   trap "launch__cleanup '$run_dir' '$engine' '$image'" EXIT
 

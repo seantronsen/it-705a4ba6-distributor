@@ -34,6 +34,6 @@ write_keys() {
   wait__check "1.0.0: rpm signed with the current key" state__has \
     --arg k openchami-keyring@1.0.0 --arg f "$current" \
     '.[$k].packages | map(select(.format == "rpm")) | length == 1 and all(.signed_with == $f)'
-  poll__download_published "$run" "$dir"
+  s3__download_release openchami-keyring 1.0.0 "$dir"
   keyring__check "$dir" 1.0.0 "$current" "$next"
 }

@@ -98,28 +98,3 @@ poll__run() {
   github__run_wait "$(settings__get .repos.distributor.remote)" "$id" > /dev/null || return 1
   echo "$id"
 }
-
-################################################################################
-# Downloads the repositories a poll run published into one directory, laid out as the
-# distributor publishes them: rpm/, deb/, keys/archive.asc.
-# Arguments:
-#   Run id, destination directory.
-# Returns:
-#   0, or 1 when a download failed.
-################################################################################
-poll__download_published() {
-  local repo tmp format
-  repo=$(settings__get .repos.distributor.remote)
-  tmp=$(mktemp -d)
-  for format in rpm deb; do
-    if ! gh run download "$1" -R "$repo" -n "target-publish-$format" -D "$tmp/$format"; then
-      log__error "can't download run $1's published $format repository"
-      return 1
-    fi
-  done
-  # Both carry keys/archive.asc, the same file.
-  if ! mkdir -p "$2" || ! cp -a "$tmp/rpm/." "$tmp/deb/." "$2/"; then
-    log__error "can't copy the published repositories to $2"
-    return 1
-  fi
-}

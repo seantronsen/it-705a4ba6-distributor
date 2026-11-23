@@ -16,6 +16,7 @@ teardown() {
   name=$(suite__repo_name "$repo")
   id=$(github__user_id)
   distributor__push_config > /dev/null << EOF
+$(distributor__target)
 publishers:
   "$id": {username: distributor-it, repos: [$service_repo]}
 repos:

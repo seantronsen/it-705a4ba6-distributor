@@ -60,15 +60,7 @@ jobs:
         # admit dirs by their result.json.
         run: |
           mapfile -t dirs < <(find admit -name result.json -printf '%h\n' 2>/dev/null)
-          PUBLISH_DIR=$PWD/publish-target scripts/publish.sh "$FORMAT" delta "${dirs[@]}"
-      # The prototype's target is transient: keep it briefly for inspection (and for prune).
-      - name: Upload publish target
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: target-publish-${{ matrix.format }}
-          path: publish-target/
-          if-no-files-found: ignore
-          retention-days: 7
+          scripts/publish.sh "$FORMAT" delta "${dirs[@]}"
       - name: Upload delta
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

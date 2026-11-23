@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The openchami-keyring packages the keyring workflow publishes, in downloaded repositories.
+# The openchami-keyring packages the keyring workflow publishes, downloaded from the bucket.
 
 [[ -n ${_IT_KEYRING_SH:-} ]] && return 0
 _IT_KEYRING_SH=1
@@ -36,8 +36,8 @@ keyring__deb_fprs() {
 }
 
 ################################################################################
-# Whether the rpm installs /etc/pki/rpm-gpg/RPM-GPG-KEY-openchami (the distro tests check its
-# content).
+# Whether the rpm installs /etc/pki/rpm-gpg/RPM-GPG-KEY-openchami (s3/cases/install.bats checks
+# its content).
 # Arguments:
 #   The rpm.
 # Returns:

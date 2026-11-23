@@ -14,9 +14,8 @@ teardown() {
   local role=fixture repo fpr key meta tmp
   repo=$(settings__get ".repos.$role.remote")
   fpr=$(keys__fpr archive)
-  meta="public,max-age=$(settings__get .s3.remote.metadata_max_age),must-revalidate"
+  meta="public,max-age=$(settings__get .s3.metadata_max_age),must-revalidate"
   tmp=$(mktemp -d)
-  s3__use > /dev/null
   crafted__release "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
   poll__run > /dev/null
   wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published

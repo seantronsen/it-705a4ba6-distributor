@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside the tools container that ci/run.sh or distro/run.sh starts; never run it by hand.
+# Runs inside the tools container that ci/run.sh or s3/run.sh starts; never run it by hand.
 # Installs the tools, sets up GitHub access, and runs bats on one suite's tests.
 #
 #   run-in-container.sh <suite> [test name... | bats option...]
@@ -32,7 +32,7 @@ main() {
   export GH_TOKEN
   container__install_tools || exit 1
   container__setup_github_access || exit 1
-  # The engine command for lib/engine.sh, when the run has one (distro: podman-remote).
+  # The engine command for lib/engine.sh, when the run has one (s3: podman-remote).
   if settings__has .run.engine; then
     IT_ENGINE=$(settings__get .run.engine) || exit 1
     export IT_ENGINE

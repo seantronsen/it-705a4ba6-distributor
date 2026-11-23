@@ -36,7 +36,7 @@ jobs:
           ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: PUBLISH_DIR=$RUNNER_TEMP/target scripts/rekey.sh "$FORMAT" delta
+        run: scripts/rekey.sh "$FORMAT" delta
       # Kept even when re-signing fails or times out: record commits the progress.
       - name: Upload delta
         if: ${{ always() }}

@@ -21,6 +21,7 @@ teardown() {
   keys__set_archive_secret locked
   # Denying the key gives prune something to remove.
   run=$(distributor__push_config << EOF
+$(distributor__target)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):

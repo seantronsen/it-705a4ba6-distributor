@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The distros' own package managers installing from published repositories, each in a clean
-# sibling container, checking signatures against the archive key. A base URL is file:///repo
-# for the files themselves (mounted at /repo), or the gateway's URL.
+# sibling container, checking signatures against the archive key from /repo/keys/archive.asc
+# (the directory mounted at /repo). The base URL is the bucket's.
 
 [[ -n ${_IT_TARGET_SH:-} ]] && return 0
 _IT_TARGET_SH=1

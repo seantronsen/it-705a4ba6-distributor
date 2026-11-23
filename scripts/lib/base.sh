@@ -6,10 +6,8 @@
 #   CONFIG                 config file (default config/repos.yaml)
 #   STATE                  state file (default state/state.json)
 #   GITHUB_TOKEN           gh's token for the GitHub API (releases, assets, runs, issues)
-#   PUBLISH_DIR            local publish target, used when the config sets no `target`
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   credentials for the config's `target.s3`
-#   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (default, local target only:
-#                          throwaway key)
+#   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (required to sign)
 #   ARCHIVE_GPG_PASSPHRASE its passphrase, if any
 #   MASTER_PUBLIC_ASC, MASTER_FPR   root public key and fingerprint (admit)
 

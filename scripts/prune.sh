@@ -128,7 +128,6 @@ pruned=$(retention_packages "$denied")
 write_delta "$pruned" "$denied"
 remove=$(jq -c -s 'add' <<< "$pruned $denied")
 
-target__init
 mapfile -t orphans < <(orphan_paths)
 if [[ $(jq length <<< "$remove") -eq 0 && ${#orphans[@]} -eq 0 ]]; then
   log__info "prune $fmt: nothing to remove"

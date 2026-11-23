@@ -15,6 +15,7 @@ teardown() {
   name=$(suite__repo_name "$repo")
   # GitHub user 1 is someone else: the suite's user isn't a publisher.
   distributor__push_config > /dev/null << EOF
+$(distributor__target)
 publishers:
   "1": {username: mojombo}
 repos:

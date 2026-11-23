@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Repository metadata updates for publish, prune, and rekey, without downloading old packages.
-# Needs target__init and keys__init_archive first.
+# Needs keys__init_archive first.
 
 [[ -n ${_LIB_REPO_SH:-} ]] && return 0
 _LIB_REPO_SH=1

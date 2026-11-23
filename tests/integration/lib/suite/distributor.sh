@@ -22,13 +22,29 @@ distributor__publishers() {
 }
 
 ################################################################################
-# The default config: the gh user may publish, the service repo is allowed its packages, the
-# fixture repo nothing extra.
+# The target block: the test bucket.
+# Outputs:
+#   config/repos.yaml lines on stdout.
+################################################################################
+distributor__target() {
+  cat << EOF
+target:
+  s3:
+    bucket: $(settings__get .s3.bucket)
+    region: $(settings__get .s3.region)
+    metadata-max-age: $(settings__get .s3.metadata_max_age)
+EOF
+}
+
+################################################################################
+# The default config: publishing to the test bucket, the gh user may publish, the service repo
+# is allowed its packages, the fixture repo nothing extra.
 # Outputs:
 #   config/repos.yaml content on stdout.
 ################################################################################
 distributor__default_config() {
   cat << EOF
+$(distributor__target)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):

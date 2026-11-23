@@ -34,7 +34,6 @@ if [[ $(jq length <<< "$new") -eq 0 ]]; then
 fi
 log__info "publish $fmt: $(jq length <<< "$new") new"
 
-target__init
 keys__init_archive
 
 # rpms record the archive key that signed them, so rekey knows what to re-sign.

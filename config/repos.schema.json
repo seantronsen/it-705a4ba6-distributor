@@ -5,10 +5,10 @@
   "description": "Who may publish, and the service repos to poll. See the comments in config/repos.yaml.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["publishers", "repos"],
+  "required": ["target", "publishers", "repos"],
   "properties": {
     "target": {
-      "description": "Where to publish. Without it, each job publishes to a throwaway local directory (inspection only).",
+      "description": "Where to publish.",
       "type": "object",
       "additionalProperties": false,
       "required": ["s3"],

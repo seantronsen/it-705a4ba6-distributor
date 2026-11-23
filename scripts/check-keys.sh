@@ -5,10 +5,9 @@
 #
 # Fails when ARCHIVE_GPG_KEY isn't keys/archive.asc (keys__init_archive) or expires within
 # WARN_DAYS, and keeps the "Archive key expiring" and "Archive key switch due" issues open or
-# closed to match. Skipped for a throwaway key (local target, no ARCHIVE_GPG_KEY).
+# closed to match. Fails without ARCHIVE_GPG_KEY, so a poll never runs without the key.
 source "$(dirname "$0")/lib/github.sh"
 source "$(dirname "$0")/lib/keys.sh"
-source "$(dirname "$0")/lib/target.sh"
 
 WARN_DAYS=30
 EXPIRING="Archive key expiring"
@@ -74,11 +73,6 @@ carrying it for the grace period. Switch keys now (spec-deferred.md, Rotation, s
   fi
 }
 
-target__init
-if [[ -z ${ARCHIVE_GPG_KEY:-} ]]; then
-  log__info "check-keys: ARCHIVE_GPG_KEY not set (throwaway key); skipped"
-  exit 0
-fi
 keys__init_archive
 check_switch_due
 check_expiry

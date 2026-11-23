@@ -88,8 +88,8 @@ repos:
 # -------------------------------------------------------------------------
 
 containers:
-  # The container engine: podman or docker. The distro tests need rootless
-  # podman (their tools container gets its socket).
+  # The container engine: podman or docker. The s3 tests need rootless podman
+  # (their tools container gets its socket).
   #
   # Default: unset (rootless podman, else podman, else docker: the first
   #          installed)
@@ -101,20 +101,15 @@ containers:
     # Default: docker.io/library/debian:13
     tools: docker.io/library/debian:13
 
-    # distro: the Fedora target (dnf installs).
+    # s3/cases/install.bats: the Fedora client (dnf installs).
     #
     # Default: docker.io/library/fedora:42
     fedora: docker.io/library/fedora:42
 
-    # distro: the Debian target (apt installs).
+    # s3/cases/install.bats: the Debian client (apt installs).
     #
     # Default: docker.io/library/debian:13
     debian: docker.io/library/debian:13
-
-    # distro: the temporary S3 gateway.
-    #
-    # Default: docker.io/versity/versitygw:v1.10.0
-    versitygw: docker.io/versity/versitygw:v1.10.0
 
 # -------------------------------------------------------------------------
 # Runs
@@ -164,44 +159,21 @@ keys:
 # -------------------------------------------------------------------------
 
 s3:
-  # A real AWS test bucket the s3 integration tests publish to.
-  remote:
-    # Its name, region, and public base URL. Normally left unset:
-    # s3/init-aws.sh creates one and records it in its state file
-    # (~/.local/state/distributor-it/s3.json), and s3/destroy-aws.sh deletes
-    # it. Set here, they're used instead (with credentials in
-    # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY).
-    #
-    # Default: unset (the state file's)
-    #bucket: my-bucket
-    #region: us-east-1
-    #url: https://my-bucket.s3.us-east-1.amazonaws.com
+  # The AWS test bucket every test publishes to (target.s3 in the
+  # distributor's config).
+  #
+  # Its name, region, and public base URL. Normally left unset:
+  # s3/init-aws.sh creates one and records it in its state file
+  # (~/.local/state/distributor-it/s3.json), and s3/destroy-aws.sh deletes it.
+  # Set here, they're used instead (with credentials in AWS_ACCESS_KEY_ID and
+  # AWS_SECRET_ACCESS_KEY).
+  #
+  # Default: unset (the state file's)
+  #bucket: my-bucket
+  #region: us-east-1
+  #url: https://my-bucket.s3.us-east-1.amazonaws.com
 
-    # The metadata-max-age the tests give the distributor's S3 target, in
-    # seconds.
-    #
-    # Default: 60
-    metadata_max_age: 60
-
-  # The temporary local S3 gateway (versitygw) the distro integration tests
-  # install from.
-  local:
-    # Its root credentials. Not secret: it's reachable only from the
-    # containers on its private network (and 127.0.0.1 when kept), and it
-    # serves public test data.
-    #
-    # Default: it / distributor-it
-    access_key: it
-    secret_key: distributor-it
-
-    # Leave it running after its test file, with its files, published on
-    # 127.0.0.1:<port>, for inspection. The end of the test file logs how to
-    # remove it; nothing removes it automatically.
-    #
-    # Default: false
-    keep: false
-
-    # Host port a kept gateway is published on (127.0.0.1 only).
-    #
-    # Default: 7070
-    port: 7070
+  # The metadata-max-age the tests give the distributor's target, in seconds.
+  #
+  # Default: 60
+  metadata_max_age: 60

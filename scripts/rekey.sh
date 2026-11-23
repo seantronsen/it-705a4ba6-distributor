@@ -88,7 +88,6 @@ mkdir -p "$2"
 delta=$(cd "$2" && pwd)/rekey-$fmt.json
 jq -n --arg fmt "$fmt" '{format: $fmt, patches: []}' > "$delta"
 
-target__init
 keys__init_archive
 work=$(mktemp -d)
 if [[ $fmt == rpm ]]; then rekey_rpm "$delta"; else rekey_deb; fi

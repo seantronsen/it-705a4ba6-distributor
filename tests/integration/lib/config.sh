@@ -124,7 +124,7 @@ config__build() {
     config__check_conflicts "$user" "$repos" "$(config__file_state_repos)" || return 1
   fi
   if [[ -f "$(config__file_state_s3_bucket)" ]]; then
-    bucket=$(config__json "$(config__file_state_s3_bucket)" | jq -c '{s3: {remote: {bucket, region, url}}}') || return 1
+    bucket=$(config__json "$(config__file_state_s3_bucket)" | jq -c '{s3: {bucket, region, url}}') || return 1
     config__check_conflicts "$user" "$bucket" "$(config__file_state_s3_bucket)" || return 1
   fi
   IT_CONFIG_JSON=$(jq -cn --argjson d "$defaults" --argjson u "$user" --argjson r "$repos" \

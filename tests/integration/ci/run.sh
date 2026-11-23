@@ -5,6 +5,11 @@
 #   ci/run.sh retention noop         these tests (file names, .bats optional)
 #   ci/run.sh --filter 'deny'        bats options pass through
 #
+# Every test publishes to the test bucket: from s3/init-aws.sh (run it once), or s3.bucket,
+# .region, and .url in your config with credentials scoped to the bucket in AWS_ACCESS_KEY_ID and
+# AWS_SECRET_ACCESS_KEY. They're set as the distributor's secrets from the host; the container
+# never sees them. The bucket's contents are overwritten.
+#
 # Runs in one transient tools container without the container engine; git pushes through your
 # SSH agent. Logs go to stderr; results (TAP) to stdout and <output_dir>/<run id>/report.tap,
 # with exported files in artifacts/ there.

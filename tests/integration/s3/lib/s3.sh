@@ -1,42 +1,12 @@
 # shellcheck shell=bash
-# The test bucket: the distributor config that publishes to it, and reading it back over its
-# public HTTPS URL.
+# The test bucket the distributor publishes to: reading it back over its public HTTPS URL.
 
 [[ -n ${_IT_S3_SH:-} ]] && return 0
 _IT_S3_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/settings.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/suite/distributor.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/suite/state.sh"
-
-################################################################################
-# The default config, publishing to the test bucket.
-# Outputs:
-#   config/repos.yaml content on stdout.
-################################################################################
-s3__config() {
-  distributor__default_config
-  cat << EOF
-target:
-  s3:
-    bucket: $(settings__get .s3.remote.bucket)
-    region: $(settings__get .s3.remote.region)
-    metadata-max-age: $(settings__get .s3.remote.metadata_max_age)
-EOF
-}
-
-################################################################################
-# Publishes to the test bucket from now on: pushes s3__config and waits for its poll, whose
-# prune also removes whatever earlier tests left there.
-# Outputs:
-#   The poll's run id on stdout.
-# Returns:
-#   0, or 1 when the push or its poll failed.
-################################################################################
-s3__use() {
-  s3__config | distributor__push_config
-}
 
 ################################################################################
 # An object's URL.
@@ -46,7 +16,7 @@ s3__use() {
 #   The URL on stdout.
 ################################################################################
 s3__url() {
-  echo "$(settings__get .s3.remote.url)/$1"
+  echo "$(settings__get .s3.url)/$1"
 }
 
 ################################################################################
@@ -144,4 +114,22 @@ s3__release_keys() {
   local format name file
   state__get | jq -r --arg k "$1@$2" '.[$k].packages[] | [.format, .name, .filename] | @tsv' |
     while IFS=$'\t' read -r format name file; do s3__package_key "$format" "$name" "$file"; done
+}
+
+################################################################################
+# Downloads a release's packages from the bucket, each under its key (rpm/..., deb/...).
+# Arguments:
+#   Repo path (owner/name, or openchami-keyring), tag, destination directory.
+# Returns:
+#   0, or 1 when a download failed.
+################################################################################
+s3__download_release() {
+  local key
+  for key in $(s3__release_keys "$1" "$2"); do
+    mkdir -p "$3/$(dirname "$key")"
+    if ! s3__get "$key" "$3/$key"; then
+      log__error "can't download $key from the bucket"
+      return 1
+    fi
+  done
 }

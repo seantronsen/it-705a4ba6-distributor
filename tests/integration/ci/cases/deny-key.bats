@@ -18,6 +18,7 @@ teardown() {
   crafted__release "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
   distributor__push_config > /dev/null << EOF
+$(distributor__target)
 $(distributor__publishers)
 repos:
   $(settings__get .repos.service.remote):

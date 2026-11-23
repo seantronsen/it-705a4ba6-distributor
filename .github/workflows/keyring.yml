@@ -34,7 +34,7 @@ jobs:
         env:
           ARCHIVE_GPG_KEY: ${{ secrets.ARCHIVE_GPG_KEY }}
           ARCHIVE_GPG_PASSPHRASE: ${{ secrets.ARCHIVE_GPG_PASSPHRASE }}
-        run: PUBLISH_DIR=$RUNNER_TEMP/target scripts/keyring.sh admit
+        run: scripts/keyring.sh admit
       - name: Upload admission
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

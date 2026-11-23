@@ -30,6 +30,7 @@ outcome() {
   if [[ $me == "$(suite__repo_name "$service_repo")"-* ]]; then longer=true; fi
 
   distributor__push_config > /dev/null << EOF
+$(distributor__target)
 $(distributor__publishers)
 repos:
   $service_repo:
@@ -64,6 +65,7 @@ EOF
 
   # Moving it-shared to the fixture's allow doesn't hand it over: the service repo published it.
   distributor__push_config > /dev/null << EOF
+$(distributor__target)
 $(distributor__publishers)
 repos:
   $service_repo:
