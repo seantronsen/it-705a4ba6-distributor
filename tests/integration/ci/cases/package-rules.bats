@@ -32,9 +32,9 @@ outcome() {
   distributor__push_config > /dev/null << EOF
 $(distributor__publishers)
 repos:
-  - name: $service_repo
+  $service_repo:
     allow: $(settings__get '.repos.service.packages + ["it-shared", "it-twice"] | tojson')
-  - name: $fixture_repo
+  $fixture_repo:
     allow: [it-twice]
 EOF
   crafted__release fixture v1.0.0-a "zzz-other 1.0.0"
@@ -66,9 +66,9 @@ EOF
   distributor__push_config > /dev/null << EOF
 $(distributor__publishers)
 repos:
-  - name: $service_repo
+  $service_repo:
     allow: $(settings__get '.repos.service.packages + ["it-twice"] | tojson')
-  - name: $fixture_repo
+  $fixture_repo:
     allow: [it-twice, it-shared]
 EOF
   crafted__release fixture v1.0.0-d2 "it-shared 2.0.0"

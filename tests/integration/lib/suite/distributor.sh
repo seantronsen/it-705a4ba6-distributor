@@ -31,9 +31,9 @@ distributor__default_config() {
   cat << EOF
 $(distributor__publishers)
 repos:
-  - name: $(settings__get .repos.service.remote)
+  $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
-  - name: $(settings__get .repos.fixture.remote)
+  $(settings__get .repos.fixture.remote): {}
 EOF
 }
 

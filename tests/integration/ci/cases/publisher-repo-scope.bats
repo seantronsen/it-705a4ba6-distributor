@@ -19,9 +19,9 @@ teardown() {
 publishers:
   "$id": {username: distributor-it, repos: [$service_repo]}
 repos:
-  - name: $service_repo
+  $service_repo:
     allow: $(settings__get '.repos.service.packages | tojson')
-  - name: $repo
+  $repo: {}
 EOF
   crafted__release "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null

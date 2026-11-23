@@ -18,9 +18,9 @@ teardown() {
   # No publishers, and a key the schema doesn't know.
   run=$(distributor__push_config << EOF
 repos:
-  - name: $(settings__get .repos.service.remote)
+  $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
-  - name: $repo
+  $repo:
     colour: blue
 EOF
   )

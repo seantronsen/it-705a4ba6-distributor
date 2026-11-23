@@ -20,9 +20,9 @@ teardown() {
   distributor__push_config > /dev/null << EOF
 $(distributor__publishers)
 repos:
-  - name: $(settings__get .repos.service.remote)
+  $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
-  - name: $repo
+  $repo:
     deny:
       - fingerprint: $(keys__fpr fixture)
         reason: distributor-it

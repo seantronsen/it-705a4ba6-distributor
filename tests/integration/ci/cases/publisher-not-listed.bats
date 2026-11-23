@@ -18,9 +18,9 @@ teardown() {
 publishers:
   "1": {username: mojombo}
 repos:
-  - name: $(settings__get .repos.service.remote)
+  $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
-  - name: $repo
+  $repo: {}
 EOF
   crafted__release "$role" v1.0.0 "$name 1.0.0"
   poll__run > /dev/null
