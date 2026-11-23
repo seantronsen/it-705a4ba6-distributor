@@ -1,10 +1,20 @@
 # shellcheck shell=bash
-# The config: config/repos.yaml, checked against config/repos.schema.json.
+# The config: config/repos.yaml, checked against config/repos.schema.json. Read once, with each
+# repo's omitted settings filled from the schema's defaults, into CONFIG_JSON (exported, so child
+# processes such as publish's parallel uploads reuse it).
 
 [[ -n ${_LIB_CONFIG_SH:-} ]] && return 0
 _LIB_CONFIG_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
+
+if [[ -z ${CONFIG_JSON:-} ]]; then
+  CONFIG_JSON=$(yq -o=json -I=0 . "$CONFIG" \
+    | base__jq -c --slurpfile s "$ROOT/config/repos.schema.json" \
+      'import "config" as config; config::with_defaults($s[0])') \
+    || log__fatal "can't read $CONFIG"
+  export CONFIG_JSON
+fi
 
 ################################################################################
 # Whether a config setting is set.
@@ -12,7 +22,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/base.sh"
 #   <jq path>
 ################################################################################
 config__has() {
-  yq -o=json -I=0 . "$CONFIG" | jq -e "$1 != null" > /dev/null
+  jq -e "$1 != null" <<< "$CONFIG_JSON" > /dev/null
 }
 
 ################################################################################
@@ -24,9 +34,7 @@ config__has() {
 #   The value on stdout: scalars raw, objects and arrays as JSON.
 ################################################################################
 config__get() {
-  yq -o=json -I=0 . "$CONFIG" \
-    | jq -r "$1"' | if . == null then error("unset") elif type == "object" or type == "array"
-        then tojson else . end' 2> /dev/null \
-    || log__fatal "config: $1 isn't set"
+  jq -r "$1"' | if . == null then error("unset") elif type == "object" or type == "array"
+    then tojson else . end' <<< "$CONFIG_JSON" 2> /dev/null || log__fatal "config: $1 isn't set"
 }
 

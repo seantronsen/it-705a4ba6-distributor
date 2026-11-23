@@ -106,12 +106,14 @@
         "additionalProperties": false,
         "properties": {
           "allow": {
+            "default": [],
             "description": "Extra package names beyond <repo> and <repo>-*.",
             "type": "array",
             "uniqueItems": true,
             "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$" }
           },
           "deny": {
+            "default": [],
             "description": "Revoked repo keys.",
             "type": "array",
             "items": {
@@ -135,6 +137,7 @@
             }
           },
           "retain": {
+            "default": [],
             "description": "Exact package versions never pruned.",
             "type": "array",
             "items": {
@@ -153,6 +156,7 @@
             }
           },
           "keep-releases": {
+            "default": [],
             "description": "major.minor lines kept past end of life, quoted (unquoted 1.10 reads as 1.1).",
             "type": "array",
             "uniqueItems": true,

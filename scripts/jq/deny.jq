@@ -15,4 +15,4 @@ def packages($cfg):
 
 # Why $repo's key $fpr is denied, or nothing when it isn't (input: $cfg).
 def reason($repo; $fpr):
-  first((.[$repo].deny // [])[] | select(.fingerprint == $fpr) | .reason // "no reason given");
+  first(.[$repo].deny[] | select(.fingerprint == $fpr) | .reason // "no reason given");

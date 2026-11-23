@@ -10,7 +10,7 @@ def claims($n; $s): $n == $s or ($n | startswith($s + "-"));
 # $state: state/state.json; $cfg: the repos, keyed by name; $repo: the release's repo.
 def check($state; $cfg; $repo):
   short($repo) as $me
-  | ($cfg[$repo].allow // []) as $allow
+  | $cfg[$repo].allow as $allow
   | [$cfg | to_entries[] | select(.key != $repo) | {name: .key} + .value] as $others
   # Historical owners: the repos that published each name, from state.
   | ($state | state::owners) as $owners
@@ -24,7 +24,7 @@ def check($state; $cfg; $repo):
               else empty end)
            elif ($allow | index($p.name)) == null and (claims($p.name; $me) | not) then
              "\($p.filename): \($p.name) is not \($me) or \($me)-* and not in allow"
-           elif any($others[]; ((.allow // []) | index($p.name)) != null) then
+           elif any($others[]; (.allow | index($p.name)) != null) then
              "\($p.filename): \($p.name) is in another repo's allow"
            elif any($others[]; (short(.name) | length) > ($me | length)
                and claims($p.name; short(.name))) then
