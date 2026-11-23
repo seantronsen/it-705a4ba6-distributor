@@ -6,7 +6,7 @@ def apply($d):
   if $d.key then
     .[$d.key] = ($d | {status, at, run}
       + (if .status == "published" then {repo_key, packages: [.packages[] | del(.path)]}
-         else {reasons} end))
+         else {reasons, packages: []} end))
   else
     reduce $d.patches[] as $p (.;
       if .[$p.release] == null then .

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "state.schema.json",
   "title": "Distributor state (state/state.json)",
-  "description": "Every release processed and every package published or pruned.sh. See State in docs/spec.md.",
+  "description": "Every release processed and every package published or pruned. See State in docs/spec.md.",
   "type": "object",
   "propertyNames": {
     "description": "<owner>/<repo>@<tag>, or openchami-keyring@<version>.",
@@ -11,7 +11,7 @@
   "additionalProperties": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["status", "at", "run"],
+    "required": ["status", "at", "run", "packages"],
     "properties": {
       "status": { "enum": ["published", "skipped", "rejected"] },
       "at": {
@@ -29,7 +29,7 @@
         "anyOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }]
       },
       "packages": {
-        "description": "Its packages (published only).",
+        "description": "Its packages ([] when skipped or rejected).",
         "type": "array",
         "items": {
           "type": "object",
@@ -68,7 +68,7 @@
       }
     },
     "if": { "properties": { "status": { "const": "published" } } },
-    "then": { "required": ["repo_key", "packages"] },
+    "then": { "required": ["repo_key"] },
     "else": { "required": ["reasons"] }
   },
   "$defs": {
