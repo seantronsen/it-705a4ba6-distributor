@@ -1,7 +1,7 @@
 # Each keyring build bumps the patch, so retention keeps only the latest keyring.
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
+  source "${BATS_TEST_DIRNAME}/../../lib/harness.sh"
   lifecycle__reset
 }
 

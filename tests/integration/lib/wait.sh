@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Waiting on GitHub: retry a check until it passes, without fixed sleeps.
 
-[[ -n ${_IT_WAIT_SH:-} ]] && return 0
+[[ -n "${_IT_WAIT_SH:-}" ]] && return 0
 _IT_WAIT_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
@@ -18,26 +18,26 @@ source "$(dirname "${BASH_SOURCE[0]}")/suite/suite.sh"
 #   0 when done, 1 on timeout or when the command gave up.
 ################################################################################
 wait__until() {
-  local desc=$1 deadline rc
+  local desc="$1" deadline rc
   shift
-  deadline=$((SECONDS + $(settings__get .wait.timeout)))
-  log__info "waiting: $desc"
+  deadline="$((SECONDS + $(settings__get .wait.timeout)))"
+  log__info "waiting: ${desc}"
   while true; do
     rc=0
-    "$@" || rc=$?
-    case $rc in
+    "$@" || rc="$?"
+    case "${rc}" in
       0)
-        log__info "done: $desc"
+        log__info "done: ${desc}"
         return 0
         ;;
       1) ;;
       *)
-        log__error "gave up: $desc"
+        log__error "gave up: ${desc}"
         return 1
         ;;
     esac
     if ((SECONDS >= deadline)); then
-      log__error "timed out after $(settings__get .wait.timeout)s: $desc"
+      log__error "timed out after $(settings__get .wait.timeout)s: ${desc}"
       return 1
     fi
     sleep "$(settings__get .wait.interval)"
@@ -55,15 +55,15 @@ wait__until() {
 #   0 when the command succeeded, 1 otherwise.
 ################################################################################
 wait__check() {
-  local desc=$1 try
+  local desc="$1" try
   shift
   for try in {1..3}; do
     if "$@"; then
-      log__info "ok: $desc"
+      log__info "ok: ${desc}"
       return 0
     fi
     if ((try < 3)); then sleep 10; fi
   done
-  log__error "check failed: $desc"
+  log__error "check failed: ${desc}"
   return 1
 }

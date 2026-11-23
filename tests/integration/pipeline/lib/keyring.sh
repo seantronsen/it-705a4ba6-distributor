@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The openchami-keyring packages the keyring workflow publishes, downloaded from the bucket.
 
-[[ -n ${_IT_KEYRING_SH:-} ]] && return 0
+[[ -n "${_IT_KEYRING_SH:-}" ]] && return 0
 _IT_KEYRING_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
@@ -16,10 +16,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/suite/keys.sh"
 ################################################################################
 keyring__package() {
   local pattern
-  if [[ $2 == rpm ]]; then pattern="openchami-keyring-$3-*.rpm"; else
+  if [[ "$2" == rpm ]]; then pattern="openchami-keyring-$3-*.rpm"; else
     pattern="openchami-keyring_$3-*.deb"
   fi
-  find "$1/$2" -name "$pattern" | head -n 1
+  find "$1/$2" -name "${pattern}" | head -n 1
 }
 
 ################################################################################
@@ -56,20 +56,21 @@ keyring__has_rpm_key() {
 #   0 when both match, 1 otherwise.
 ################################################################################
 keyring__check() {
-  local dir=$1 version=$2 rpm deb failed=false
+  local dir="$1" version="$2" rpm deb failed=false
   shift 2
-  rpm=$(keyring__package "$dir" rpm "$version")
-  deb=$(keyring__package "$dir" deb "$version")
-  if [[ -z $rpm ]] || ! keyring__has_rpm_key "$rpm"; then
-    log__error "no keyring rpm $version installing the key file in $dir"
+  rpm="$(keyring__package "${dir}" rpm "${version}")"
+  deb="$(keyring__package "${dir}" deb "${version}")"
+  if [[ -z "${rpm}" ]] || ! keyring__has_rpm_key "${rpm}"; then
+    log__error "no keyring rpm ${version} installing the key file in ${dir}"
     failed=true
   fi
-  if [[ -z $deb ]]; then
-    log__error "no keyring deb $version in $dir"
+  if [[ -z "${deb}" ]]; then
+    log__error "no keyring deb ${version} in ${dir}"
     failed=true
-  elif [[ $(keyring__deb_fingerprints "$deb") != "$(printf '%s\n' "$@" | sort)" ]]; then
-    log__error "keyring deb $version carries $(keyring__deb_fingerprints "$deb" | xargs), not $*"
+  elif [[ "$(keyring__deb_fingerprints "${deb}")" != "$(printf '%s\n' "$@" | sort)" ]]; then
+    log__error "keyring deb ${version} carries" \
+      "$(keyring__deb_fingerprints "${deb}" | xargs), not $*"
     failed=true
   fi
-  ! $failed
+  ! ${failed}
 }

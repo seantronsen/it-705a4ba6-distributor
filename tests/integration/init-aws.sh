@@ -81,19 +81,19 @@ s3_init__lifecycle() {
 #   0, or 1 when a step failed.
 ################################################################################
 s3_init__bucket() {
-  local name=$1 region=$2 location=()
+  local name="$1" region="$2" location=()
   # us-east-1 is the default location and refuses being named.
-  if [[ $region != us-east-1 ]]; then
-    location=(--create-bucket-configuration "LocationConstraint=$region")
+  if [[ "${region}" != us-east-1 ]]; then
+    location=(--create-bucket-configuration "LocationConstraint=${region}")
   fi
-  aws s3api create-bucket --bucket "$name" --region "$region" "${location[@]}" > /dev/null &&
-    aws s3api put-bucket-tagging --bucket "$name" --region "$region" \
+  aws s3api create-bucket --bucket "${name}" --region "${region}" "${location[@]}" > /dev/null &&
+    aws s3api put-bucket-tagging --bucket "${name}" --region "${region}" \
       --tagging 'TagSet=[{Key=purpose,Value=distributor-it}]' &&
-    aws s3api put-public-access-block --bucket "$name" --region "$region" \
+    aws s3api put-public-access-block --bucket "${name}" --region "${region}" \
       --public-access-block-configuration "$(s3_init__public_access)" &&
-    aws s3api put-bucket-policy --bucket "$name" --region "$region" \
-      --policy "$(s3_init__bucket_policy "$name")" &&
-    aws s3api put-bucket-lifecycle-configuration --bucket "$name" --region "$region" \
+    aws s3api put-bucket-policy --bucket "${name}" --region "${region}" \
+      --policy "$(s3_init__bucket_policy "${name}")" &&
+    aws s3api put-bucket-lifecycle-configuration --bucket "${name}" --region "${region}" \
       --lifecycle-configuration "$(s3_init__lifecycle)" > /dev/null
 }
 
@@ -106,41 +106,41 @@ s3_init__bucket() {
 #   0, or 1 when a step failed.
 ################################################################################
 s3_init__user() {
-  local name=$1
-  aws iam create-user --user-name "$name" --tags Key=purpose,Value=distributor-it > /dev/null &&
-    aws iam put-user-policy --user-name "$name" --policy-name bucket \
-      --policy-document "$(s3_init__user_policy "$name")" &&
-    (umask 077 && aws iam create-access-key --user-name "$name" --output json |
+  local name="$1"
+  aws iam create-user --user-name "${name}" --tags Key=purpose,Value=distributor-it > /dev/null &&
+    aws iam put-user-policy --user-name "${name}" --policy-name bucket \
+      --policy-document "$(s3_init__user_policy "${name}")" &&
+    (umask 077 && aws iam create-access-key --user-name "${name}" --output json |
       jq '.AccessKey // error("no access key")
         | {access_key_id: .AccessKeyId, secret_access_key: .SecretAccessKey}' \
         > "$(config__file_state_s3_credentials)")
 }
 
 main() {
-  local region=${1:-${AWS_REGION:-us-east-1}} file name
-  file=$(config__file_state_s3_bucket)
-  if [[ -e $file || -e $(config__file_state_s3_credentials) ]]; then
-    log__fatal "already initialized: $file or $(config__file_state_s3_credentials) exists;" \
+  local region="${1:-${AWS_REGION:-us-east-1}}" file name
+  file="$(config__file_state_s3_bucket)"
+  if [[ -e "${file}" || -e "$(config__file_state_s3_credentials)" ]]; then
+    log__fatal "already initialized: ${file} or $(config__file_state_s3_credentials) exists;" \
       "destroy-aws.sh deletes what they list"
   fi
   if ! aws sts get-caller-identity > /dev/null 2>&1; then
     log__fatal "the AWS CLI has no working credentials (aws configure, or set AWS_PROFILE)"
   fi
-  name=distributor-it-$(random__hex 8)
+  name="distributor-it-$(random__hex 8)"
 
   # Recorded first, so a failure part way still leaves destroy-aws.sh the names.
-  mkdir -p "$(dirname "$file")" || log__fatal "can't create $(dirname "$file")"
-  if ! jq -n --arg n "$name" --arg r "$region" '{bucket: $n, region: $r,
-    url: "https://\($n).s3.\($r).amazonaws.com"}' > "$file"; then
-    log__fatal "can't write $file"
+  mkdir -p "$(dirname "${file}")" || log__fatal "can't create $(dirname "${file}")"
+  if ! jq -n --arg n "${name}" --arg r "${region}" '{bucket: $n, region: $r,
+    url: "https://\($n).s3.\($r).amazonaws.com"}' > "${file}"; then
+    log__fatal "can't write ${file}"
   fi
-  s3_init__bucket "$name" "$region" ||
-    log__fatal "the bucket $name wasn't set up; destroy-aws.sh deletes what was created"
-  log__info "created the bucket $name ($region)"
-  s3_init__user "$name" ||
-    log__fatal "the user $name wasn't set up; destroy-aws.sh deletes what was created"
-  log__info "created the IAM user $name and its access key"
-  log__info "recorded in $file and $(config__file_state_s3_credentials); the suites use them" \
+  s3_init__bucket "${name}" "${region}" ||
+    log__fatal "the bucket ${name} wasn't set up; destroy-aws.sh deletes what was created"
+  log__info "created the bucket ${name} (${region})"
+  s3_init__user "${name}" ||
+    log__fatal "the user ${name} wasn't set up; destroy-aws.sh deletes what was created"
+  log__info "created the IAM user ${name} and its access key"
+  log__info "recorded in ${file} and $(config__file_state_s3_credentials); the suites use them" \
     "(new access keys can take a minute to work)"
 }
 

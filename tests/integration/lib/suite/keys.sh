@@ -9,7 +9,7 @@
 #
 # Plus other archive keys the tests make, public key files, and signature checks.
 
-[[ -n ${_IT_KEYS_SH:-} ]] && return 0
+[[ -n "${_IT_KEYS_SH:-}" ]] && return 0
 _IT_KEYS_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -46,13 +46,13 @@ keys__fingerprint() {
 ################################################################################
 keys__generate() {
   local fpr
-  fpr=$(keys__gpg --batch --yes --status-fd 1 --passphrase '' --pinentry-mode loopback \
-    --quick-generate-key "$@" 2> /dev/null | awk '$2 == "KEY_CREATED" {print $4}')
-  if [[ -z $fpr ]]; then
+  fpr="$(keys__gpg --batch --yes --status-fd 1 --passphrase '' --pinentry-mode loopback \
+    --quick-generate-key "$@" 2> /dev/null | awk '$2 == "KEY_CREATED" {print $4}')"
+  if [[ -z "${fpr}" ]]; then
     log__error "can't generate a key for $1"
     return 1
   fi
-  echo "$fpr"
+  echo "${fpr}"
 }
 
 ################################################################################
@@ -65,7 +65,7 @@ keys__generate() {
 #   0, or 1 when generation failed.
 ################################################################################
 keys__archive_generate() {
-  keys__generate "distributor-it archive $RANDOM <it-archive@invalid>" \
+  keys__generate "distributor-it archive ${RANDOM} <it-archive@invalid>" \
     "$(settings__get .keys.algorithm_archive)" sign "$1"
 }
 
@@ -91,23 +91,23 @@ keys__certify() {
 ################################################################################
 keys__create() {
   local dir root role fpr archive
-  dir=$(settings__get .run.share_dir)
-  install -d -m 700 "$dir/gnupg" "$dir/keys"
+  dir="$(settings__get .run.share_dir)"
+  install -d -m 700 "${dir}/gnupg" "${dir}/keys"
   # Repo keys outlive gpg-sign-artifacts' 30-day expiry check, and the archive key check-keys'.
-  root=$(keys__generate 'distributor-it root <it-root@invalid>' \
-    "$(settings__get .keys.algorithm_attestation)" cert 7d) || return 1
-  echo "$root" > "$dir/keys/root.fpr"
-  log__info "keys: root $root"
+  root="$(keys__generate 'distributor-it root <it-root@invalid>' \
+    "$(settings__get .keys.algorithm_attestation)" cert 7d)" || return 1
+  echo "${root}" > "${dir}/keys/root.fpr"
+  log__info "keys: root ${root}"
   for role in $(settings__get '.repos | del(.distributor) | keys[]'); do
-    fpr=$(keys__generate "$(settings__get ".repos.$role.remote") RPM Signing Key" \
-      "$(settings__get .keys.algorithm_attestation)" cert 60d) || return 1
-    keys__certify "$root" "$fpr" || return 1
-    echo "$fpr" > "$dir/keys/$role.fpr"
-    log__info "keys: $role $fpr"
+    fpr="$(keys__generate "$(settings__get ".repos.${role}.remote") RPM Signing Key" \
+      "$(settings__get .keys.algorithm_attestation)" cert 60d)" || return 1
+    keys__certify "${root}" "${fpr}" || return 1
+    echo "${fpr}" > "${dir}/keys/${role}.fpr"
+    log__info "keys: ${role} ${fpr}"
   done
-  archive=$(keys__archive_generate 60d) || return 1
-  echo "$archive" > "$dir/keys/archive.fpr"
-  log__info "keys: archive $archive"
+  archive="$(keys__archive_generate 60d)" || return 1
+  echo "${archive}" > "${dir}/keys/archive.fpr"
+  log__info "keys: archive ${archive}"
 }
 
 ################################################################################
@@ -134,7 +134,7 @@ keys__archive_secret_set() {
 #   The value on stdout.
 ################################################################################
 keys__archive_secret() {
-  if [[ $1 == locked ]]; then
+  if [[ "$1" == locked ]]; then
     keys__archive_locked
   else
     keys__gpg --armor --export-secret-keys "$1"
@@ -150,21 +150,21 @@ keys__archive_secret() {
 ################################################################################
 keys__archive_locked() {
   local home fpr status=0
-  fpr=$(keys__fingerprint archive)
+  fpr="$(keys__fingerprint archive)"
   # A copy of the GnuPG home, so the run's own copy stays unprotected.
-  home=$(mktemp -d) || return 1
-  cp -a "$(settings__get .run.share_dir)/gnupg/." "$home/"
-  if GNUPGHOME=$home gpg --batch --pinentry-mode loopback --passphrase distributor-it \
-    --change-passphrase "$fpr" 2> /dev/null; then
-    GNUPGHOME=$home gpg --batch --pinentry-mode loopback --passphrase distributor-it \
-      --armor --export-secret-keys "$fpr"
+  home="$(mktemp -d)" || return 1
+  cp -a "$(settings__get .run.share_dir)/gnupg/." "${home}/"
+  if GNUPGHOME="${home}" gpg --batch --pinentry-mode loopback --passphrase distributor-it \
+    --change-passphrase "${fpr}" 2> /dev/null; then
+    GNUPGHOME="${home}" gpg --batch --pinentry-mode loopback --passphrase distributor-it \
+      --armor --export-secret-keys "${fpr}"
   else
     log__error "can't lock the archive key"
     status=1
   fi
-  GNUPGHOME=$home gpgconf --kill gpg-agent
-  rm -rf "$home"
-  return "$status"
+  GNUPGHOME="${home}" gpgconf --kill gpg-agent
+  rm -rf "${home}"
+  return "${status}"
 }
 
 ################################################################################
@@ -176,9 +176,9 @@ keys__secrets_set() {
   local repo
   for repo in $(settings__get '.repos[].remote'); do
     if ! keys__gpg --armor --export "$(keys__fingerprint root)" |
-      gh secret set MASTER_PUBLIC_ASC -R "$repo" ||
-      ! printf '%s' "$(keys__fingerprint root)" | gh secret set MASTER_FPR -R "$repo"; then
-      log__error "can't set the root key secrets on $repo"
+      gh secret set MASTER_PUBLIC_ASC -R "${repo}" ||
+      ! printf '%s' "$(keys__fingerprint root)" | gh secret set MASTER_FPR -R "${repo}"; then
+      log__error "can't set the root key secrets on ${repo}"
       return 1
     fi
   done
@@ -198,11 +198,11 @@ keys__secrets_set() {
 keys__secrets_delete() {
   local repo name failed=false
   for repo in $(settings__get '.repos[].remote'); do
-    for name in $(gh secret list -R "$repo" --json name -q '.[].name'); do
-      gh secret delete "$name" -R "$repo" || failed=true
+    for name in $(gh secret list -R "${repo}" --json name -q '.[].name'); do
+      gh secret delete "${name}" -R "${repo}" || failed=true
     done
   done
-  if $failed; then
+  if ${failed}; then
     log__error "couldn't delete every secret"
     return 1
   fi

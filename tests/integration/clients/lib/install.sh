@@ -4,7 +4,7 @@
 # (the directory mounted at /repo); or openchami-keyring, then trusting the repository through
 # the key it installed instead. The base URL is the bucket's.
 
-[[ -n ${_IT_INSTALL_SH:-} ]] && return 0
+[[ -n "${_IT_INSTALL_SH:-}" ]] && return 0
 _IT_INSTALL_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/log.sh"
@@ -18,9 +18,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/engine.sh"
 #   0 when installed, 1 otherwise.
 ################################################################################
 install__package_dnf() {
-  local image=$1 dir=$2 base=$3 package=$4
+  local image="$1" dir="$2" base="$3" package="$4"
   shift 4
-  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \
+  if ! engine__run -i -v "${dir}:/repo:ro" -e "BASE=${base}" -e "PACKAGE=${package}" "$@" \
+    "${image}" \
     bash -s << 'EOF'; then
 set -euo pipefail
 cat > /etc/yum.repos.d/it.repo << REPO
@@ -34,7 +35,7 @@ REPO
 dnf -y -q --disablerepo='*' --enablerepo=it install "$PACKAGE"
 rpm -q "$PACKAGE"
 EOF
-    log__error "dnf on $image couldn't install $package from $base"
+    log__error "dnf on ${image} couldn't install ${package} from ${base}"
     return 1
   fi
 }
@@ -48,9 +49,10 @@ EOF
 #   0 when installed, 1 otherwise.
 ################################################################################
 install__package_apt() {
-  local image=$1 dir=$2 base=$3 package=$4
+  local image="$1" dir="$2" base="$3" package="$4"
   shift 4
-  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" -e "PACKAGE=$package" "$@" "$image" \
+  if ! engine__run -i -v "${dir}:/repo:ro" -e "BASE=${base}" -e "PACKAGE=${package}" "$@" \
+    "${image}" \
     bash -s << 'EOF'; then
 set -euo pipefail
 install -Dm644 /repo/keys/archive.asc /etc/apt/keyrings/it.asc
@@ -60,7 +62,7 @@ apt=(apt-get -o Dir::Etc::sourcelist=/etc/apt/it.list -o Dir::Etc::sourceparts=-
 "${apt[@]}" install -y -qq "$PACKAGE"
 dpkg -s "$PACKAGE" | grep ^Version
 EOF
-    log__error "apt on $image couldn't install $package from $base"
+    log__error "apt on ${image} couldn't install ${package} from ${base}"
     return 1
   fi
 }
@@ -74,9 +76,9 @@ EOF
 #   0 when both steps pass, 1 otherwise.
 ################################################################################
 install__keyring_dnf() {
-  local image=$1 dir=$2 base=$3
+  local image="$1" dir="$2" base="$3"
   shift 3
-  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" "$@" "$image" bash -s << 'EOF'; then
+  if ! engine__run -i -v "${dir}:/repo:ro" -e "BASE=${base}" "$@" "${image}" bash -s << 'EOF'; then
 set -euo pipefail
 # dnf skips a repository that fails verification, and succeeds, unless told otherwise.
 repo() { # <id> <gpgkey>
@@ -92,7 +94,7 @@ dnf clean all > /dev/null
 repo it-keyring file:///etc/pki/rpm-gpg/RPM-GPG-KEY-openchami
 dnf -y -q --disablerepo='*' --enablerepo=it-keyring makecache
 EOF
-    log__error "dnf on $image: the keyring from $base didn't install or verify the repository"
+    log__error "dnf on ${image}: the keyring from ${base} didn't install or verify the repository"
     return 1
   fi
 }
@@ -106,9 +108,9 @@ EOF
 #   0 when both steps pass, 1 otherwise.
 ################################################################################
 install__keyring_apt() {
-  local image=$1 dir=$2 base=$3
+  local image="$1" dir="$2" base="$3"
   shift 3
-  if ! engine__run -i -v "$dir:/repo:ro" -e "BASE=$base" "$@" "$image" bash -s << 'EOF'; then
+  if ! engine__run -i -v "${dir}:/repo:ro" -e "BASE=${base}" "$@" "${image}" bash -s << 'EOF'; then
 set -euo pipefail
 apt=(apt-get -o Dir::Etc::sourcelist=/etc/apt/it.list -o Dir::Etc::sourceparts=-)
 install -Dm644 /repo/keys/archive.asc /etc/apt/keyrings/it.asc
@@ -121,7 +123,7 @@ echo "deb [signed-by=/usr/share/keyrings/openchami-keyring.asc] $BASE/deb stable
 # apt only warns when verification fails, unless told otherwise.
 "${apt[@]}" update -qq --error-on=any
 EOF
-    log__error "apt on $image: the keyring from $base didn't install or verify the repository"
+    log__error "apt on ${image}: the keyring from ${base} didn't install or verify the repository"
     return 1
   fi
 }

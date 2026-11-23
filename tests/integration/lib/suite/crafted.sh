@@ -2,7 +2,7 @@
 # Crafted releases: tiny but real rpm and deb packages, signed through the run's key chain the
 # way gpg-sign-artifacts signs a real release, published as a GitHub release in seconds.
 
-[[ -n ${_IT_CRAFTED_SH:-} ]] && return 0
+[[ -n "${_IT_CRAFTED_SH:-}" ]] && return 0
 _IT_CRAFTED_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -20,20 +20,21 @@ source "$(dirname "${BASH_SOURCE[0]}")/../wait.sh"
 #   0, or 1 when the build failed.
 ################################################################################
 crafted__build_deb() {
-  local out=$1 name=$2 version=$3 rev=${4:-1} root
-  root=$(mktemp -d)
-  mkdir -p "$root/DEBIAN" "$root/usr/share/doc/$name"
-  cat > "$root/DEBIAN/control" << EOF
-Package: $name
-Version: $version-$rev
+  local out="$1" name="$2" version="$3" rev="${4:-1}" root
+  root="$(mktemp -d)"
+  mkdir -p "${root}/DEBIAN" "${root}/usr/share/doc/${name}"
+  cat > "${root}/DEBIAN/control" << EOF
+Package: ${name}
+Version: ${version}-${rev}
 Architecture: all
 Maintainer: distributor-it <it@invalid>
 Description: distributor integration test package
 EOF
-  echo distributor-it > "$root/usr/share/doc/$name/README"
-  if ! dpkg-deb --root-owner-group -Zgzip --build "$root" "$out/${name}_${version}-${rev}_all.deb" \
+  echo distributor-it > "${root}/usr/share/doc/${name}/README"
+  if ! dpkg-deb --root-owner-group -Zgzip --build "${root}" \
+    "${out}/${name}_${version}-${rev}_all.deb" \
     > /dev/null; then
-    log__error "can't build the deb $name $version-$rev"
+    log__error "can't build the deb ${name} ${version}-${rev}"
     return 1
   fi
 }
@@ -46,13 +47,13 @@ EOF
 #   0, or 1 when the build failed.
 ################################################################################
 crafted__build_rpm() {
-  local out=$1 name=$2 version=$3 rel=${4:-1} top
-  top=$(mktemp -d)
-  mkdir -p "$top/SPECS"
-  cat > "$top/SPECS/$name.spec" << EOF
-Name: $name
-Version: $version
-Release: $rel
+  local out="$1" name="$2" version="$3" rel="${4:-1}" top
+  top="$(mktemp -d)"
+  mkdir -p "${top}/SPECS"
+  cat > "${top}/SPECS/${name}.spec" << EOF
+Name: ${name}
+Version: ${version}
+Release: ${rel}
 Summary: distributor integration test package
 License: MIT
 BuildArch: noarch
@@ -62,9 +63,10 @@ distributor integration test package
 
 %files
 EOF
-  if ! rpmbuild --quiet --define "_topdir $top" -bb "$top/SPECS/$name.spec" > /dev/null 2>&1 ||
-    ! mv "$top"/RPMS/noarch/*.rpm "$out/"; then
-    log__error "can't build the rpm $name $version-$rel"
+  if ! rpmbuild --quiet --define "_topdir ${top}" -bb "${top}/SPECS/${name}.spec" > /dev/null \
+    2>&1 ||
+    ! mv "${top}"/RPMS/noarch/*.rpm "${out}/"; then
+    log__error "can't build the rpm ${name} ${version}-${rel}"
     return 1
   fi
 }
@@ -78,25 +80,25 @@ EOF
 #   0, or 1 when signing failed.
 ################################################################################
 crafted__sign_checksums() {
-  local dir=$1 role=$2 repo signing
-  repo=$(settings__get ".repos.$role.remote") || return 1
-  if ! (cd "$dir" && sha256sum -- *.rpm *.deb > checksums.txt); then
-    log__error "can't checksum $dir"
+  local dir="$1" role="$2" repo signing
+  repo="$(settings__get ".repos.${role}.remote")" || return 1
+  if ! (cd "${dir}" && sha256sum -- *.rpm *.deb > checksums.txt); then
+    log__error "can't checksum ${dir}"
     return 1
   fi
-  signing=$(keys__generate "$repo Release (distributor-it) <it@invalid>" \
-    "$(settings__get .keys.algorithm_attestation)" sign 1d) || return 1
-  if [[ ${3:-} != foreign ]]; then
-    keys__certify "$(keys__fingerprint "$role")" "$signing" || return 1
+  signing="$(keys__generate "${repo} Release (distributor-it) <it@invalid>" \
+    "$(settings__get .keys.algorithm_attestation)" sign 1d)" || return 1
+  if [[ "${3:-}" != foreign ]]; then
+    keys__certify "$(keys__fingerprint "${role}")" "${signing}" || return 1
   fi
-  if ! keys__gpg --batch --yes --armor --local-user "$signing" --detach-sign \
-    -o "$dir/checksums.txt.asc" "$dir/checksums.txt"; then
-    log__error "can't sign $dir"
+  if ! keys__gpg --batch --yes --armor --local-user "${signing}" --detach-sign \
+    -o "${dir}/checksums.txt.asc" "${dir}/checksums.txt"; then
+    log__error "can't sign ${dir}"
     return 1
   fi
-  keys__gpg --armor --export "$signing" > "$dir/pubkey-signing.asc"
-  keys__gpg --armor --export "$(keys__fingerprint "$role")" > "$dir/pubkey-repo.asc"
-  keys__gpg --armor --export "$(keys__fingerprint root)" > "$dir/pubkey-org.asc"
+  keys__gpg --armor --export "${signing}" > "${dir}/pubkey-signing.asc"
+  keys__gpg --armor --export "$(keys__fingerprint "${role}")" > "${dir}/pubkey-repo.asc"
+  keys__gpg --armor --export "$(keys__fingerprint root)" > "${dir}/pubkey-org.asc"
 }
 
 ################################################################################
@@ -109,9 +111,9 @@ crafted__sign_checksums() {
 ################################################################################
 crafted__push_tag() {
   local dir
-  dir=$(mktemp -d)
-  git__clone "$1" "$dir/repo" || return 1
-  git__push_tag "$dir/repo" "$1" "$2" || return 1
+  dir="$(mktemp -d)"
+  git__clone "$1" "${dir}/repo" || return 1
+  git__push_tag "${dir}/repo" "$1" "$2" || return 1
   wait__until "$1 $2: push run" github__has_push_run "$1" "$2"
 }
 
@@ -125,11 +127,11 @@ crafted__push_tag() {
 #   0, or 1 when building, signing, or the release failed.
 ################################################################################
 crafted__release_create() {
-  local role=$1 tag=$2 repo dir spec sign_as='' push=true gh_opts=()
+  local role="$1" tag="$2" repo dir spec sign_as='' push=true gh_opts=()
   shift 2
-  repo=$(settings__get ".repos.$role.remote") || return 1
-  while [[ ${1:-} == --* ]]; do
-    case $1 in
+  repo="$(settings__get ".repos.${role}.remote")" || return 1
+  while [[ "${1:-}" == --* ]]; do
+    case "$1" in
       --prerelease) gh_opts+=(--prerelease) ;;
       --foreign) sign_as=foreign ;;
       --no-push) push=false ;;
@@ -140,17 +142,17 @@ crafted__release_create() {
     esac
     shift
   done
-  dir=$(mktemp -d)
+  dir="$(mktemp -d)"
   for spec in "$@"; do
     # shellcheck disable=SC2086 # a spec is "name version [revision]"
-    crafted__build_deb "$dir" $spec || return 1
+    crafted__build_deb "${dir}" ${spec} || return 1
     # shellcheck disable=SC2086
-    crafted__build_rpm "$dir" $spec || return 1
+    crafted__build_rpm "${dir}" ${spec} || return 1
   done
-  crafted__sign_checksums "$dir" "$role" ${sign_as:+"$sign_as"} || return 1
-  if $push; then crafted__push_tag "$repo" "$tag" || return 1; fi
-  github__release_create "$repo" "$tag" "${gh_opts[@]}" "$dir"/* || return 1
-  log__info "released $repo $tag ($*)"
+  crafted__sign_checksums "${dir}" "${role}" ${sign_as:+"${sign_as}"} || return 1
+  if ${push}; then crafted__push_tag "${repo}" "${tag}" || return 1; fi
+  github__release_create "${repo}" "${tag}" "${gh_opts[@]}" "${dir}"/* || return 1
+  log__info "released ${repo} ${tag} ($*)"
 }
 
 ################################################################################
@@ -162,13 +164,13 @@ crafted__release_create() {
 ################################################################################
 crafted__release_copy() {
   local repo dir
-  repo=$(settings__get ".repos.$1.remote") || return 1
-  dir=$(mktemp -d)
-  if ! gh release download "$2" -R "$repo" -D "$dir"; then
-    log__error "can't download $repo $2"
+  repo="$(settings__get ".repos.$1.remote")" || return 1
+  dir="$(mktemp -d)"
+  if ! gh release download "$2" -R "${repo}" -D "${dir}"; then
+    log__error "can't download ${repo} $2"
     return 1
   fi
-  crafted__push_tag "$repo" "$3" || return 1
-  github__release_create "$repo" "$3" "$dir"/* || return 1
-  log__info "copied $repo $2 to $3"
+  crafted__push_tag "${repo}" "$3" || return 1
+  github__release_create "${repo}" "$3" "${dir}"/* || return 1
+  log__info "copied ${repo} $2 to $3"
 }

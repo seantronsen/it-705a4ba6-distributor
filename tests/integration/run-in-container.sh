@@ -16,29 +16,29 @@ source /suite/lib/settings.sh
 source /suite/lib/container.sh
 
 main() {
-  local suite=${1:-} cases files=() options=() status bats_pid failed=false
-  cases=/suite/$suite/cases
-  if [[ -z $suite || ! -d $cases ]]; then
-    log__error "no suite '$suite'"
+  local suite="${1:-}" cases files=() options=() status bats_pid failed=false
+  cases="/suite/${suite}/cases"
+  if [[ -z "${suite}" || ! -d "${cases}" ]]; then
+    log__error "no suite '${suite}'"
     failed=true
   fi
   shift
   IFS= read -r GH_TOKEN || true
-  if [[ -z $GH_TOKEN ]]; then
+  if [[ -z "${GH_TOKEN}" ]]; then
     log__error "no GitHub token on stdin"
     failed=true
   fi
-  $failed && exit 1
+  ${failed} && exit 1
   export GH_TOKEN
   container__install_tools || exit 1
   container__setup_github_access || exit 1
   # The engine command for lib/engine.sh, when the run has one (s3: podman-remote).
   if settings__has .run.engine; then
-    IT_ENGINE=$(settings__get .run.engine) || exit 1
+    IT_ENGINE="$(settings__get .run.engine)" || exit 1
     export IT_ENGINE
   fi
   while (($#)); do
-    case $1 in
+    case "$1" in
       -f | --filter | --filter-tags | --filter-status)
         options+=("$1" "${2:-}")
         shift 2 || log__fatal "$1 needs a value"
@@ -48,14 +48,14 @@ main() {
         shift
         ;;
       *)
-        files+=("$cases/${1%.bats}.bats")
+        files+=("${cases}/${1%.bats}.bats")
         shift
         ;;
     esac
   done
-  ((${#files[@]})) || files=("$cases")
-  if [[ -f $cases/setup_suite.bash ]]; then
-    options+=(--setup-suite-file "$cases/setup_suite.bash")
+  ((${#files[@]})) || files=("${cases}")
+  if [[ -f "${cases}/setup_suite.bash" ]]; then
+    options+=(--setup-suite-file "${cases}/setup_suite.bash")
   fi
   # Live log lines from tests: bats captures a test's stderr, so open a descriptor to the real
   # one and name it for log.sh.
@@ -65,16 +65,16 @@ main() {
   # a terminal would, so the running test stops and bats runs the teardowns. bats needs SIGINT's
   # default handling back: a background job of a script starts with it ignored.
   env --default-signal=INT bats --formatter tap --timing "${options[@]}" "${files[@]}" &
-  bats_pid=$!
+  bats_pid="$!"
   trap 'trap "" INT TERM; kill -INT 0' INT TERM
-  wait "$bats_pid"
-  status=$?
+  wait "${bats_pid}"
+  status="$?"
   # A signal ends the first wait early; the second collects bats' exit status.
-  if kill -0 "$bats_pid" 2> /dev/null; then
-    wait "$bats_pid"
-    status=$?
+  if kill -0 "${bats_pid}" 2> /dev/null; then
+    wait "${bats_pid}"
+    status="$?"
   fi
-  exit "$status"
+  exit "${status}"
 }
 
 main "$@"

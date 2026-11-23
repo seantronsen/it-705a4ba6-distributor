@@ -2,7 +2,7 @@
 # Every suite lib, for test files to source in one line. Each lib still sources what it needs
 # itself (and has an include guard), so sourcing one lib alone keeps working.
 
-[[ -n ${_IT_HARNESS_SH:-} ]] && return 0
+[[ -n "${_IT_HARNESS_SH:-}" ]] && return 0
 _IT_HARNESS_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/github.sh"

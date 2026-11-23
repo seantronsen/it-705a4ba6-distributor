@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Setting up the tools container before its tests run.
 
-[[ -n ${_IT_CONTAINER_SH:-} ]] && return 0
+[[ -n "${_IT_CONTAINER_SH:-}" ]] && return 0
 _IT_CONTAINER_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"

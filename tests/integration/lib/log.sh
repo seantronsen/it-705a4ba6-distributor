@@ -2,7 +2,7 @@
 # Logging for every script in the suites, on the host and in containers: timestamped lines on
 # stderr, tagged with the running test's name inside bats.
 
-[[ -n ${_IT_LOG_SH:-} ]] && return 0
+[[ -n "${_IT_LOG_SH:-}" ]] && return 0
 _IT_LOG_SH=1
 
 ################################################################################
@@ -15,10 +15,10 @@ _IT_LOG_SH=1
 #   "[HH:MM:SS] <LEVEL> <test>: <message>" on IT_LOG_FD, or stderr.
 ################################################################################
 log__base() {
-  local level=$1 tag=${BATS_TEST_DESCRIPTION:+$BATS_TEST_DESCRIPTION: }
+  local level="$1" tag="${BATS_TEST_DESCRIPTION:+${BATS_TEST_DESCRIPTION}: }"
   shift
   # Inside bats, stderr is captured per test: run-in-container.sh opens IT_LOG_FD on the real one.
-  TZ=UTC printf '[%(%H:%M:%S)T] %s %s%s\n' -1 "$level" "$tag" "$*" >&"${IT_LOG_FD:-2}"
+  TZ=UTC printf '[%(%H:%M:%S)T] %s %s%s\n' -1 "${level}" "${tag}" "$*" >&"${IT_LOG_FD:-2}"
 }
 
 ################################################################################

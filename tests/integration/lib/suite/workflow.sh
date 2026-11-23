@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The distributor's workflows besides poll (keyring, rekey): dispatching one and finding its runs.
 
-[[ -n ${_IT_WORKFLOW_SH:-} ]] && return 0
+[[ -n "${_IT_WORKFLOW_SH:-}" ]] && return 0
 _IT_WORKFLOW_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -43,12 +43,12 @@ workflow__has_run_after() {
 ################################################################################
 workflow__wait_next() {
   local repo id
-  repo=$(settings__get .repos.distributor.remote)
+  repo="$(settings__get .repos.distributor.remote)"
   wait__until "$1: a new run" workflow__has_run_after "$@" || return 1
-  id=$(workflow__latest "$1" "${3:-}")
-  log__info "$1 run: https://github.com/$repo/actions/runs/$id"
-  github__run_wait "$repo" "$id" > /dev/null || return 1
-  echo "$id"
+  id="$(workflow__latest "$1" "${3:-}")"
+  log__info "$1 run: https://github.com/${repo}/actions/runs/${id}"
+  github__run_wait "${repo}" "${id}" > /dev/null || return 1
+  echo "${id}"
 }
 
 ################################################################################
@@ -62,18 +62,18 @@ workflow__wait_next() {
 ################################################################################
 workflow__run() {
   local repo before id conclusion
-  repo=$(settings__get .repos.distributor.remote)
-  before=$(workflow__latest "$1")
-  if ! gh workflow run "$1" -R "$repo" --ref main > /dev/null; then
+  repo="$(settings__get .repos.distributor.remote)"
+  before="$(workflow__latest "$1")"
+  if ! gh workflow run "$1" -R "${repo}" --ref main > /dev/null; then
     log__error "can't dispatch $1"
     return 1
   fi
-  id=$(workflow__wait_next "$1" "$before") || return 1
-  conclusion=$(gh api "repos/$repo/actions/runs/$id" -q .conclusion)
-  if [[ $conclusion != success ]]; then
-    log__error "$1 run $id: $conclusion"
-    github__run_failures_log "$repo" "$id"
+  id="$(workflow__wait_next "$1" "${before}")" || return 1
+  conclusion="$(gh api "repos/${repo}/actions/runs/${id}" -q .conclusion)"
+  if [[ "${conclusion}" != success ]]; then
+    log__error "$1 run ${id}: ${conclusion}"
+    github__run_failures_log "${repo}" "${id}"
     return 1
   fi
-  echo "$id"
+  echo "${id}"
 }

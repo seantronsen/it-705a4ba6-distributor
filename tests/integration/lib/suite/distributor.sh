@@ -2,7 +2,7 @@
 # The throwaway distributor repo: its config, edits to it, and the issues it opens. Seeding and
 # resetting it are in lifecycle.sh.
 
-[[ -n ${_IT_DISTRIBUTOR_SH:-} ]] && return 0
+[[ -n "${_IT_DISTRIBUTOR_SH:-}" ]] && return 0
 _IT_DISTRIBUTOR_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -71,22 +71,22 @@ EOF
 ################################################################################
 distributor__config_push() {
   local repo dir sha id
-  repo=$(settings__get .repos.distributor.remote)
-  dir=$(mktemp -d)
-  git__clone "$repo" "$dir/repo" || return 1
-  cat > "$dir/repo/config/distributor.yaml"
-  if git -C "$dir/repo" diff --quiet; then
+  repo="$(settings__get .repos.distributor.remote)"
+  dir="$(mktemp -d)"
+  git__clone "${repo}" "${dir}/repo" || return 1
+  cat > "${dir}/repo/config/distributor.yaml"
+  if git -C "${dir}/repo" diff --quiet; then
     log__info "config unchanged"
     return 0
   fi
-  git__commit "$dir/repo" "it: config" || return 1
-  git__push_main "$dir/repo" "$repo" || return 1
-  sha=$(git -C "$dir/repo" rev-parse HEAD)
-  wait__until "poll triggered by config ${sha:0:7}" poll__has_push_run "$sha" || return 1
-  id=$(poll__push_run "$sha")
-  log__info "poll run: https://github.com/$repo/actions/runs/$id"
-  github__run_wait "$repo" "$id" > /dev/null || return 1
-  echo "$id"
+  git__commit "${dir}/repo" "it: config" || return 1
+  git__push_main "${dir}/repo" "${repo}" || return 1
+  sha="$(git -C "${dir}/repo" rev-parse HEAD)"
+  wait__until "poll triggered by config ${sha:0:7}" poll__has_push_run "${sha}" || return 1
+  id="$(poll__push_run "${sha}")"
+  log__info "poll run: https://github.com/${repo}/actions/runs/${id}"
+  github__run_wait "${repo}" "${id}" > /dev/null || return 1
+  echo "${id}"
 }
 
 ################################################################################
@@ -99,16 +99,16 @@ distributor__config_push() {
 ################################################################################
 distributor__edit() {
   local repo dir
-  repo=$(settings__get .repos.distributor.remote)
-  dir=$(mktemp -d)
-  git__clone "$repo" "$dir/repo" || return 1
-  if ! (cd "$dir/repo" && "${@:2}"); then
-    log__error "can't edit $repo: ${*:2}"
+  repo="$(settings__get .repos.distributor.remote)"
+  dir="$(mktemp -d)"
+  git__clone "${repo}" "${dir}/repo" || return 1
+  if ! (cd "${dir}/repo" && "${@:2}"); then
+    log__error "can't edit ${repo}: ${*:2}"
     return 1
   fi
-  git__commit "$dir/repo" "it: $1" || return 1
-  git__push_main "$dir/repo" "$repo" || return 1
-  github__wait_idle "$repo"
+  git__commit "${dir}/repo" "it: $1" || return 1
+  git__push_main "${dir}/repo" "${repo}" || return 1
+  github__wait_idle "${repo}"
 }
 
 ################################################################################

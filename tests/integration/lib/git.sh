@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # git against the throwaway repos, over SSH (the host's agent is mounted into the container).
 
-[[ -n ${_IT_GIT_SH:-} ]] && return 0
+[[ -n "${_IT_GIT_SH:-}" ]] && return 0
 _IT_GIT_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"

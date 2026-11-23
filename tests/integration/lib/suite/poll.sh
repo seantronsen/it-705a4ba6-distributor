@@ -2,7 +2,7 @@
 # The distributor's poll runs: finding them, dispatching them, and downloading the repositories
 # a run published.
 
-[[ -n ${_IT_POLL_SH:-} ]] && return 0
+[[ -n "${_IT_POLL_SH:-}" ]] && return 0
 _IT_POLL_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -31,7 +31,7 @@ poll__push_run() {
 #   0 when it has, 1 otherwise.
 ################################################################################
 poll__has_push_run() {
-  [[ -n $(poll__push_run "$1") ]]
+  [[ -n "$(poll__push_run "$1")" ]]
 }
 
 ################################################################################
@@ -68,20 +68,21 @@ poll__has_dispatches_after() {
 #   0, or 1 when they didn't start.
 ################################################################################
 poll__dispatch() {
-  local repo count=$1 before i id
-  repo=$(settings__get .repos.distributor.remote)
-  before=$(workflow__latest poll.yml)
+  local repo count="$1" before i id
+  repo="$(settings__get .repos.distributor.remote)"
+  before="$(workflow__latest poll.yml)"
   for ((i = 0; i < count; i++)); do
-    if ! gh workflow run poll.yml -R "$repo" --ref main > /dev/null; then
+    if ! gh workflow run poll.yml -R "${repo}" --ref main > /dev/null; then
       log__error "can't dispatch poll"
       return 1
     fi
   done
-  wait__until "$count dispatched poll(s) start" poll__has_dispatches_after "$before" "$count" ||
+  wait__until "${count} dispatched poll(s) start" poll__has_dispatches_after "${before}" \
+    "${count}" ||
     return 1
-  for id in $(poll__dispatches_after "$before" | head -n "$count"); do
-    log__info "poll run: https://github.com/$repo/actions/runs/$id"
-    echo "$id"
+  for id in $(poll__dispatches_after "${before}" | head -n "${count}"); do
+    log__info "poll run: https://github.com/${repo}/actions/runs/${id}"
+    echo "${id}"
   done
 }
 
@@ -94,7 +95,7 @@ poll__dispatch() {
 ################################################################################
 poll__run() {
   local id
-  id=$(poll__dispatch 1) || return 1
-  github__run_wait "$(settings__get .repos.distributor.remote)" "$id" > /dev/null || return 1
-  echo "$id"
+  id="$(poll__dispatch 1)" || return 1
+  github__run_wait "$(settings__get .repos.distributor.remote)" "${id}" > /dev/null || return 1
+  echo "${id}"
 }

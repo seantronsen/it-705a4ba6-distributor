@@ -42,10 +42,10 @@ s3_destroy__user() {
     log__info "the IAM user $1 doesn't exist; skipping it"
     return 0
   fi
-  keys=$(aws iam list-access-keys --user-name "$1" \
-    --query 'AccessKeyMetadata[].AccessKeyId' --output text) || return 1
-  for key in $keys; do
-    aws iam delete-access-key --user-name "$1" --access-key-id "$key" || return 1
+  keys="$(aws iam list-access-keys --user-name "$1" \
+    --query 'AccessKeyMetadata[].AccessKeyId' --output text)" || return 1
+  for key in ${keys}; do
+    aws iam delete-access-key --user-name "$1" --access-key-id "${key}" || return 1
   done
   # Missing when init-aws.sh stopped before it; delete-user fails below if it's really still there.
   aws iam delete-user-policy --user-name "$1" --policy-name bucket 2> /dev/null
@@ -54,31 +54,31 @@ s3_destroy__user() {
 
 main() {
   local file name region answer failed=false
-  file=$(config__file_state_s3_bucket)
-  [[ -f $file ]] || log__fatal "$file not found: init-aws.sh created nothing to destroy"
-  if ! name=$(jq -r '.bucket // empty' "$file") ||
-    ! region=$(jq -r '.region // empty' "$file"); then
-    log__fatal "can't read $file"
+  file="$(config__file_state_s3_bucket)"
+  [[ -f "${file}" ]] || log__fatal "${file} not found: init-aws.sh created nothing to destroy"
+  if ! name="$(jq -r '.bucket // empty' "${file}")" ||
+    ! region="$(jq -r '.region // empty' "${file}")"; then
+    log__fatal "can't read ${file}"
   fi
   # Only what init-aws.sh creates: the bucket and the user share its name.
-  if [[ ! $name =~ ^distributor-it-[0-9a-f]{8}$ ]]; then
-    log__fatal "refusing: $file lists resources init-aws.sh doesn't create"
+  if [[ ! "${name}" =~ ^distributor-it-[0-9a-f]{8}$ ]]; then
+    log__fatal "refusing: ${file} lists resources init-aws.sh doesn't create"
   fi
   if ! aws sts get-caller-identity > /dev/null 2>&1; then
     log__fatal "the AWS CLI has no working credentials (aws configure, or set AWS_PROFILE)"
   fi
 
-  printf '%s\n' "These will be deleted:" "  bucket $name ($region), with every object in it" \
-    "  IAM user $name, with its policy and access keys" >&2
+  printf '%s\n' "These will be deleted:" "  bucket ${name} (${region}), with every object in it" \
+    "  IAM user ${name}, with its policy and access keys" >&2
   read -r -p "Type Y to delete them: " answer
-  [[ $answer == Y ]] || log__fatal "nothing deleted"
-  s3_destroy__bucket "$name" "$region" || failed=true
-  s3_destroy__user "$name" || failed=true
+  [[ "${answer}" == Y ]] || log__fatal "nothing deleted"
+  s3_destroy__bucket "${name}" "${region}" || failed=true
+  s3_destroy__user "${name}" || failed=true
 
   # Kept until everything is gone, so a rerun finishes the job.
-  $failed && log__fatal "not everything was deleted; rerun destroy-aws.sh"
-  rm -f "$file" "$(config__file_state_s3_credentials)"
-  log__info "removed $file and $(config__file_state_s3_credentials)"
+  ${failed} && log__fatal "not everything was deleted; rerun destroy-aws.sh"
+  rm -f "${file}" "$(config__file_state_s3_credentials)"
+  log__info "removed ${file} and $(config__file_state_s3_credentials)"
 }
 
 main "$@"

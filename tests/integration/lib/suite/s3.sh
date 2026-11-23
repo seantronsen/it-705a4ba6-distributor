@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The test bucket the distributor publishes to: reading it back over its public HTTPS URL.
 
-[[ -n ${_IT_S3_SH:-} ]] && return 0
+[[ -n "${_IT_S3_SH:-}" ]] && return 0
 _IT_S3_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -50,7 +50,7 @@ s3__has_object() {
 ################################################################################
 s3__is_gone() {
   # 403 without listing rights, else 404.
-  [[ $(curl -sSI -o /dev/null -w '%{http_code}' "$(s3__url "$1")") == 40[34] ]]
+  [[ "$(curl -sSI -o /dev/null -w '%{http_code}' "$(s3__url "$1")")" == 40[34] ]]
 }
 
 ################################################################################
@@ -100,7 +100,7 @@ s3__apt_https_options() {
 #   The key on stdout.
 ################################################################################
 s3__package_key() {
-  if [[ $1 == rpm ]]; then echo "rpm/packages/$3"; else echo "deb/pool/main/${2:0:1}/$2/$3"; fi
+  if [[ "$1" == rpm ]]; then echo "rpm/packages/$3"; else echo "deb/pool/main/${2:0:1}/$2/$3"; fi
 }
 
 ################################################################################
@@ -113,7 +113,8 @@ s3__package_key() {
 s3__release_keys() {
   local format name file
   state__json | jq -r --arg k "$1@$2" '.[$k].packages[] | [.format, .name, .filename] | @tsv' |
-    while IFS=$'\t' read -r format name file; do s3__package_key "$format" "$name" "$file"; done
+    while IFS=$'\t' read -r format name file; do s3__package_key "${format}" "${name}" \
+      "${file}"; done
 }
 
 ################################################################################
@@ -126,9 +127,9 @@ s3__release_keys() {
 s3__release_download() {
   local key
   for key in $(s3__release_keys "$1" "$2"); do
-    mkdir -p "$3/$(dirname "$key")"
-    if ! s3__get "$key" "$3/$key"; then
-      log__error "can't download $key from the bucket"
+    mkdir -p "$3/$(dirname "${key}")"
+    if ! s3__get "${key}" "$3/${key}"; then
+      log__error "can't download ${key} from the bucket"
       return 1
     fi
   done

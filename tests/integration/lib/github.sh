@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Generic GitHub API helpers through gh.
 
-[[ -n ${_IT_GITHUB_SH:-} ]] && return 0
+[[ -n "${_IT_GITHUB_SH:-}" ]] && return 0
 _IT_GITHUB_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
@@ -82,7 +82,7 @@ github__run_failures_log() {
 #   0 when completed, 1 otherwise.
 ################################################################################
 github__is_run_completed() {
-  [[ $(gh api "repos/$1/actions/runs/$2" -q .status) == completed ]]
+  [[ "$(gh api "repos/$1/actions/runs/$2" -q .status)" == completed ]]
 }
 
 ################################################################################
@@ -96,9 +96,9 @@ github__is_run_completed() {
 ################################################################################
 github__has_jobs_concluded() {
   local conclusions
-  conclusions=$(gh api --paginate "repos/$1/actions/runs/$2/jobs?per_page=100" \
-    -q ".jobs[] | select(.name == \"$3\" or (.name | startswith(\"$3 (\"))) | .conclusion")
-  [[ -n $conclusions ]] && ! grep -qvx "$4" <<< "$conclusions"
+  conclusions="$(gh api --paginate "repos/$1/actions/runs/$2/jobs?per_page=100" \
+    -q ".jobs[] | select(.name == \"$3\" or (.name | startswith(\"$3 (\"))) | .conclusion")"
+  [[ -n "${conclusions}" ]] && ! grep -qvx "$4" <<< "${conclusions}"
 }
 
 ################################################################################
@@ -109,7 +109,7 @@ github__has_jobs_concluded() {
 #   0 when it has, 1 otherwise.
 ################################################################################
 github__has_push_run() {
-  [[ $(gh api "repos/$1/actions/runs?event=push&branch=$2" -q '.workflow_runs | length') -gt 0 ]]
+  [[ "$(gh api "repos/$1/actions/runs?event=push&branch=$2" -q '.workflow_runs | length')" -gt 0 ]]
 }
 
 ################################################################################
@@ -147,35 +147,35 @@ github__issues() {
 #   0, or 1 when something couldn't be deleted.
 ################################################################################
 github__repo_wipe() {
-  local repo=$1 x failed=false
-  for x in $(gh api --paginate "repos/$repo/releases?per_page=100" -q '.[].tag_name'); do
-    gh release delete "$x" -R "$repo" --cleanup-tag --yes || failed=true
+  local repo="$1" x failed=false
+  for x in $(gh api --paginate "repos/${repo}/releases?per_page=100" -q '.[].tag_name'); do
+    gh release delete "${x}" -R "${repo}" --cleanup-tag --yes || failed=true
   done
   # An empty repo has no refs to list (HTTP 409).
-  if gh api "repos/$repo/commits?per_page=1" > /dev/null 2>&1; then
-    for x in $(gh api --paginate "repos/$repo/git/matching-refs/tags" -q '.[].ref'); do
-      gh api -X DELETE "repos/$repo/git/$x" || failed=true
+  if gh api "repos/${repo}/commits?per_page=1" > /dev/null 2>&1; then
+    for x in $(gh api --paginate "repos/${repo}/git/matching-refs/tags" -q '.[].ref'); do
+      gh api -X DELETE "repos/${repo}/git/${x}" || failed=true
     done
   fi
-  for x in $(gh issue list -R "$repo" --state all -L 1000 --json number -q '.[].number'); do
-    gh issue delete "$x" -R "$repo" --yes || failed=true
+  for x in $(gh issue list -R "${repo}" --state all -L 1000 --json number -q '.[].number'); do
+    gh issue delete "${x}" -R "${repo}" --yes || failed=true
   done
   for x in rejected-release denied-repo-key prune-failing archive-key; do
-    gh label delete "$x" -R "$repo" --yes > /dev/null 2>&1 || true
+    gh label delete "${x}" -R "${repo}" --yes > /dev/null 2>&1 || true
   done
-  if [[ ${2:-} == runs ]]; then
-    for x in $(gh api --paginate "repos/$repo/actions/runs?per_page=100" \
+  if [[ "${2:-}" == runs ]]; then
+    for x in $(gh api --paginate "repos/${repo}/actions/runs?per_page=100" \
       -q '.workflow_runs[] | select(.status != "completed") | .id'); do
-      gh api -X POST "repos/$repo/actions/runs/$x/cancel" > /dev/null 2>&1 || true
+      gh api -X POST "repos/${repo}/actions/runs/${x}/cancel" > /dev/null 2>&1 || true
     done
-    github__wait_idle "$repo" || failed=true
-    for x in $(gh api --paginate "repos/$repo/actions/runs?per_page=100" \
+    github__wait_idle "${repo}" || failed=true
+    for x in $(gh api --paginate "repos/${repo}/actions/runs?per_page=100" \
       -q '.workflow_runs[].id'); do
-      gh api -X DELETE "repos/$repo/actions/runs/$x" || failed=true
+      gh api -X DELETE "repos/${repo}/actions/runs/${x}" || failed=true
     done
   fi
-  if $failed; then
-    log__error "couldn't delete everything on $repo"
+  if ${failed}; then
+    log__error "couldn't delete everything on ${repo}"
     return 1
   fi
 }

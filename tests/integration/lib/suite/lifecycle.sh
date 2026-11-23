@@ -2,7 +2,7 @@
 # The suites' lifecycle on the throwaway repos: preparing them once per run, resetting them to
 # a clean baseline before every test, and cleaning them at the end of the run.
 
-[[ -n ${_IT_LIFECYCLE_SH:-} ]] && return 0
+[[ -n "${_IT_LIFECYCLE_SH:-}" ]] && return 0
 _IT_LIFECYCLE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -22,28 +22,28 @@ source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 lifecycle__guard() {
   local repo info failed=false
   for repo in $(settings__get '.repos[].remote'); do
-    if ! info=$(gh api "repos/$repo"); then
-      log__error "$repo: not found"
+    if ! info="$(gh api "repos/${repo}")"; then
+      log__error "${repo}: not found"
       failed=true
       continue
     fi
     # The distributor reads the service repos without their tokens.
-    if [[ $(jq -r .visibility <<< "$info") != public ]]; then
-      log__error "$repo: not public"
+    if [[ "$(jq -r .visibility <<< "${info}")" != public ]]; then
+      log__error "${repo}: not public"
       failed=true
     fi
-    if [[ $(jq -r .fork <<< "$info") != false ]]; then
-      log__error "$repo: a fork"
+    if [[ "$(jq -r .fork <<< "${info}")" != false ]]; then
+      log__error "${repo}: a fork"
       failed=true
     fi
     # An empty repo has no commits yet; anything else must carry the marker.
-    if gh api "repos/$repo/commits?per_page=1" > /dev/null 2>&1 &&
-      ! gh api "repos/$repo/contents/$(suite__marker)" > /dev/null 2>&1; then
-      log__error "$repo: has history but no $(suite__marker); refusing to overwrite it"
+    if gh api "repos/${repo}/commits?per_page=1" > /dev/null 2>&1 &&
+      ! gh api "repos/${repo}/contents/$(suite__marker)" > /dev/null 2>&1; then
+      log__error "${repo}: has history but no $(suite__marker); refusing to overwrite it"
       failed=true
     fi
   done
-  ! $failed
+  ! ${failed}
 }
 
 ################################################################################
@@ -57,7 +57,7 @@ lifecycle__suite_setup() {
   lifecycle__guard || return 1
   keys__create || return 1
   for repo in $(settings__get '.repos[].remote'); do
-    github__repo_wipe "$repo" runs || return 1
+    github__repo_wipe "${repo}" runs || return 1
   done
   keys__secrets_set || return 1
   lifecycle__seed_service || return 1
@@ -73,24 +73,24 @@ lifecycle__suite_setup() {
 ################################################################################
 lifecycle__seed_service() {
   local repo owner dir
-  repo=$(settings__get .repos.service.remote)
-  owner=${repo%%/*}
-  dir=$(mktemp -d)
-  if ! git clone --quiet /src/service "$dir/repo"; then
+  repo="$(settings__get .repos.service.remote)"
+  owner="${repo%%/*}"
+  dir="$(mktemp -d)"
+  if ! git clone --quiet /src/service "${dir}/repo"; then
     log__error "can't clone /src/service"
     return 1
   fi
   # Any of OpenCHAMI's service repos: .goreleaser.yaml or .yml, images named literally or by
   # template. One left in OpenCHAMI's namespace would push there.
-  if ! sed -i -E "s|ghcr\.io/openchami/|ghcr.io/${owner,,}/|Ig" "$dir"/repo/.goreleaser.y*ml ||
-    grep -q -i 'ghcr\.io/openchami/' "$dir"/repo/.goreleaser.y*ml; then
+  if ! sed -i -E "s|ghcr\.io/openchami/|ghcr.io/${owner,,}/|Ig" "${dir}"/repo/.goreleaser.y*ml ||
+    grep -q -i 'ghcr\.io/openchami/' "${dir}"/repo/.goreleaser.y*ml; then
     log__error "can't move the images to ghcr.io/${owner,,}"
     return 1
   fi
-  lifecycle__write_marker "$dir/repo"
-  git__add_tag_workflow "$dir/repo"
-  git__commit "$dir/repo" "it: seed" || return 1
-  git__push_main "$dir/repo" "$repo" --force
+  lifecycle__write_marker "${dir}/repo"
+  git__add_tag_workflow "${dir}/repo"
+  git__commit "${dir}/repo" "it: seed" || return 1
+  git__push_main "${dir}/repo" "${repo}" --force
 }
 
 ################################################################################
@@ -101,15 +101,15 @@ lifecycle__seed_service() {
 ################################################################################
 lifecycle__seed_fixture() {
   local dir
-  dir=$(mktemp -d)
-  if ! git -C "$dir" init --quiet; then
+  dir="$(mktemp -d)"
+  if ! git -C "${dir}" init --quiet; then
     log__error "can't create the fixture's seed repo"
     return 1
   fi
-  lifecycle__write_marker "$dir"
-  git__add_tag_workflow "$dir"
-  git__commit "$dir" "it: marker" || return 1
-  git__push_main "$dir" "$(settings__get .repos.fixture.remote)" --force
+  lifecycle__write_marker "${dir}"
+  git__add_tag_workflow "${dir}"
+  git__commit "${dir}" "it: marker" || return 1
+  git__push_main "${dir}" "$(settings__get .repos.fixture.remote)" --force
 }
 
 ################################################################################
@@ -122,23 +122,23 @@ lifecycle__seed_fixture() {
 lifecycle__seed_distributor() {
   local dir poll
   dir="$(settings__get .run.share_dir)/seed-distributor"
-  poll=$dir/.github/workflows/poll.yml
-  rm -rf "$dir"
-  if ! git clone --quiet /src/distributor "$dir"; then
+  poll="${dir}/.github/workflows/poll.yml"
+  rm -rf "${dir}"
+  if ! git clone --quiet /src/distributor "${dir}"; then
     log__error "can't clone /src/distributor"
     return 1
   fi
-  distributor__config_default > "$dir/config/distributor.yaml"
-  echo '{}' > "$dir/state/state.json"
+  distributor__config_default > "${dir}/config/distributor.yaml"
+  echo '{}' > "${dir}/state/state.json"
   # Tests dispatch every poll.
-  sed -i '/^  schedule:$/,/^    - cron:/d' "$poll"
-  if grep -q 'cron:' "$poll"; then
+  sed -i '/^  schedule:$/,/^    - cron:/d' "${poll}"
+  if grep -q 'cron:' "${poll}"; then
     log__error "can't drop poll's schedule"
     return 1
   fi
-  lifecycle__write_marker "$dir"
-  git__commit "$dir" "it: seed" || return 1
-  git__push_main "$dir" "$(settings__get .repos.distributor.remote)" --force || return 1
+  lifecycle__write_marker "${dir}"
+  git__commit "${dir}" "it: seed" || return 1
+  git__push_main "${dir}" "$(settings__get .repos.distributor.remote)" --force || return 1
   # The config change triggers a poll; tests start idle.
   github__wait_idle "$(settings__get .repos.distributor.remote)"
 }
@@ -162,7 +162,7 @@ lifecycle__write_marker() {
 lifecycle__reset() {
   local repo
   for repo in $(settings__get '.repos[].remote'); do
-    github__repo_wipe "$repo" || return 1
+    github__repo_wipe "${repo}" || return 1
   done
   keys__archive_secret_set "$(keys__fingerprint archive)" || return 1
   # The service repo's own CI may still run from the seed push; only its release workflow matters.
@@ -188,13 +188,13 @@ lifecycle__check_state() {
 lifecycle__reset_distributor() {
   local dir repo
   dir="$(settings__get .run.share_dir)/seed-distributor"
-  repo=$(settings__get .repos.distributor.remote)
-  github__wait_idle "$repo" || return 1
-  if [[ $(github__head_sha "$repo") != "$(git -C "$dir" rev-parse HEAD)" ]]; then
-    log__info "reset: $repo back to the seed commit"
-    git__push_main "$dir" "$repo" --force || return 1
+  repo="$(settings__get .repos.distributor.remote)"
+  github__wait_idle "${repo}" || return 1
+  if [[ "$(github__head_sha "${repo}")" != "$(git -C "${dir}" rev-parse HEAD)" ]]; then
+    log__info "reset: ${repo} back to the seed commit"
+    git__push_main "${dir}" "${repo}" --force || return 1
     # A config difference triggers a poll.
-    github__wait_idle "$repo" || return 1
+    github__wait_idle "${repo}" || return 1
   fi
 }
 
@@ -212,10 +212,10 @@ lifecycle__suite_teardown() {
   fi
   lifecycle__guard || return 1
   for repo in $(settings__get '.repos[].remote'); do
-    github__repo_wipe "$repo" runs || failed=true
+    github__repo_wipe "${repo}" runs || failed=true
   done
   keys__secrets_delete || failed=true
-  if $failed; then
+  if ${failed}; then
     return 1
   fi
 }

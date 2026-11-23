@@ -2,7 +2,7 @@
 # The suites' configuration on the host: config.defaults.yaml overridden by the user's config
 # file, plus the state files init.sh and init-aws.sh write.
 
-[[ -n ${_IT_CONFIG_SH:-} ]] && return 0
+[[ -n "${_IT_CONFIG_SH:-}" ]] && return 0
 _IT_CONFIG_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
@@ -24,7 +24,7 @@ config__file_defaults() {
 #   The path on stdout.
 ################################################################################
 config__file_user() {
-  echo "${IT_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/distributor-it/config.yaml}"
+  echo "${IT_CONFIG:-${XDG_CONFIG_HOME:-${HOME}/.config}/distributor-it/config.yaml}"
 }
 
 ################################################################################
@@ -35,7 +35,7 @@ config__file_user() {
 #   The path on stdout.
 ################################################################################
 config__file_state_repos() {
-  echo "${IT_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/distributor-it/repos.yaml}"
+  echo "${IT_STATE:-${XDG_STATE_HOME:-${HOME}/.local/state}/distributor-it/repos.yaml}"
 }
 
 ################################################################################
@@ -46,7 +46,7 @@ config__file_state_repos() {
 #   The path on stdout.
 ################################################################################
 config__file_state_s3_bucket() {
-  echo "${IT_S3_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/distributor-it/s3.json}"
+  echo "${IT_S3_STATE:-${XDG_STATE_HOME:-${HOME}/.local/state}/distributor-it/s3.json}"
 }
 
 ################################################################################
@@ -58,8 +58,8 @@ config__file_state_s3_bucket() {
 #   The path on stdout.
 ################################################################################
 config__file_state_s3_credentials() {
-  local dir=${XDG_STATE_HOME:-$HOME/.local/state}/distributor-it
-  echo "${IT_S3_CREDENTIALS:-$dir/s3-credentials.json}"
+  local dir="${XDG_STATE_HOME:-${HOME}/.local/state}/distributor-it"
+  echo "${IT_S3_CREDENTIALS:-${dir}/s3-credentials.json}"
 }
 
 ################################################################################
@@ -75,9 +75,9 @@ config__json() {
   local json
   # mikefarah's yq needs to be told; the jq-based one prints JSON anyway.
   if yq --version 2>&1 | grep -q mikefarah; then
-    json=$(yq -o=json . "$1")
+    json="$(yq -o=json . "$1")"
   else
-    json=$(yq . "$1")
+    json="$(yq . "$1")"
   fi || {
     log__error "can't read $1"
     return 1
@@ -94,10 +94,11 @@ config__json() {
 ################################################################################
 config__check_conflicts() {
   local conflicts
-  conflicts=$(jq -rn --argjson u "$1" --argjson s "$2" '[$s | paths(scalars) as $p
-    | select(($u // {}) | getpath($p) != null) | $p | map(tostring) | join(".")] | join(", ")')
-  if [[ -n $conflicts ]]; then
-    log__error "both $(config__file_user) and $3 set $conflicts: remove them from your config, or" \
+  conflicts="$(jq -rn --argjson u "$1" --argjson s "$2" '[$s | paths(scalars) as $p
+    | select(($u // {}) | getpath($p) != null) | $p | map(tostring) | join(".")] | join(", ")')"
+  if [[ -n "${conflicts}" ]]; then
+    log__error "both $(config__file_user) and $3 set ${conflicts}:" \
+      "remove them from your config, or" \
       "destroy what the state file lists (or move it aside)"
     return 1
   fi
@@ -114,24 +115,24 @@ config__check_conflicts() {
 ################################################################################
 config__build() {
   local defaults user=null repos='{}' bucket='{}'
-  [[ -n ${IT_CONFIG_JSON:-} ]] && return 0
-  defaults=$(config__json "$(config__file_defaults)") || return 1
-  if [[ -f $(config__file_user) ]]; then
-    user=$(config__json "$(config__file_user)") || return 1
+  [[ -n "${IT_CONFIG_JSON:-}" ]] && return 0
+  defaults="$(config__json "$(config__file_defaults)")" || return 1
+  if [[ -f "$(config__file_user)" ]]; then
+    user="$(config__json "$(config__file_user)")" || return 1
   fi
   if [[ -f "$(config__file_state_repos)" ]]; then
-    repos=$(config__json "$(config__file_state_repos)" | jq -c '{repos: map_values({remote: .})}') || return 1
-    config__check_conflicts "$user" "$repos" "$(config__file_state_repos)" || return 1
+    repos="$(config__json "$(config__file_state_repos)" | jq -c '{repos: map_values({remote: .})}')" || return 1
+    config__check_conflicts "${user}" "${repos}" "$(config__file_state_repos)" || return 1
   fi
   if [[ -f "$(config__file_state_s3_bucket)" ]]; then
-    bucket=$(config__json "$(config__file_state_s3_bucket)" | jq -c '{s3: {bucket, region, url}}') || return 1
-    config__check_conflicts "$user" "$bucket" "$(config__file_state_s3_bucket)" || return 1
+    bucket="$(config__json "$(config__file_state_s3_bucket)" | jq -c '{s3: {bucket, region, url}}')" || return 1
+    config__check_conflicts "${user}" "${bucket}" "$(config__file_state_s3_bucket)" || return 1
   fi
-  IT_CONFIG_JSON=$(jq -cn --argjson d "$defaults" --argjson u "$user" --argjson r "$repos" \
-    --argjson b "$bucket" '($u // {}) as $u
+  IT_CONFIG_JSON="$(jq -cn --argjson d "${defaults}" --argjson u "${user}" --argjson r "${repos}" \
+    --argjson b "${bucket}" '($u // {}) as $u
     | $d * $u * $r * $b
     | reduce ($u.repos // {} | to_entries[] | select(.value.checkout)) as $e
-        (.; .repos[$e.key].checkout = $e.value.checkout)') || return 1
+        (.; .repos[$e.key].checkout = $e.value.checkout)')" || return 1
   export IT_CONFIG_JSON
 }
 
@@ -144,7 +145,7 @@ config__build() {
 ################################################################################
 config__has() {
   config__build || return 1
-  jq -e "$1 != null" <<< "$IT_CONFIG_JSON" > /dev/null
+  jq -e "$1 != null" <<< "${IT_CONFIG_JSON}" > /dev/null
 }
 
 ################################################################################
@@ -158,7 +159,7 @@ config__has() {
 ################################################################################
 config__get() {
   config__build || return 1
-  if ! jq -r "$1"' | if . == null then error("unset") else . end' <<< "$IT_CONFIG_JSON" \
+  if ! jq -r "$1"' | if . == null then error("unset") else . end' <<< "${IT_CONFIG_JSON}" \
     2> /dev/null; then
     log__error "$1 isn't set"
     return 1

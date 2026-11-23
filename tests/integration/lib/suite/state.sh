@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The distributor's state.json on main: what it recorded about each release and its packages.
 
-[[ -n ${_IT_STATE_SH:-} ]] && return 0
+[[ -n "${_IT_STATE_SH:-}" ]] && return 0
 _IT_STATE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
@@ -36,17 +36,17 @@ state__has() {
 ################################################################################
 state__is_valid() {
   local file status
-  file=$(mktemp --suffix .json)
-  if ! state__json > "$file"; then
+  file="$(mktemp --suffix .json)"
+  if ! state__json > "${file}"; then
     log__error "can't read state.json"
-    rm -f "$file"
+    rm -f "${file}"
     return 1
   fi
-  /src/distributor/scripts/validate.sh /src/distributor/schemas/state.schema.json "$file"
-  status=$?
-  rm -f "$file"
+  /src/distributor/scripts/validate.sh /src/distributor/schemas/state.schema.json "${file}"
+  status="$?"
+  rm -f "${file}"
   ((status == 0)) || log__error "state.json on main doesn't match schemas/state.schema.json"
-  return "$status"
+  return "${status}"
 }
 
 ################################################################################

@@ -3,7 +3,7 @@
 # and the issue closes.
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
+  source "${BATS_TEST_DIRNAME}/../../lib/harness.sh"
   lifecycle__reset
 }
 
@@ -13,38 +13,39 @@ teardown() {
 
 @test "a failing prune keeps an issue open until it recovers" {
   local role=fixture repo distributor fpr run before
-  repo=$(settings__get ".repos.$role.remote")
-  distributor=$(settings__get .repos.distributor.remote)
-  fpr=$(keys__fingerprint fixture)
-  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  repo="$(settings__get ".repos.${role}.remote")"
+  distributor="$(settings__get .repos.distributor.remote)"
+  fpr="$(keys__fingerprint fixture)"
+  crafted__release_create "${role}" v1.0.0 "$(suite__repo_name "${repo}") 1.0.0"
   poll__run > /dev/null
   keys__archive_secret_set locked
   # Denying the key gives prune something to remove.
-  run=$(distributor__config_push << EOF
+  run="$(distributor__config_push << EOF
 $(distributor__config_settings)
 $(distributor__config_publishers)
 repos:
   $(settings__get .repos.service.remote):
     allow: $(settings__get '.repos.service.packages | tojson')
-  $repo:
+  ${repo}:
     deny:
-      - fingerprint: $fpr
+      - fingerprint: ${fpr}
         reason: distributor-it
 EOF
-  )
+  )"
   wait__check "first poll: prune failed" \
-    github__has_jobs_concluded "$distributor" "$run" "prune / prune" failure
-  before=$(github__head_sha "$distributor")
-  run=$(poll__run)
+    github__has_jobs_concluded "${distributor}" "${run}" "prune / prune" failure
+  before="$(github__head_sha "${distributor}")"
+  run="$(poll__run)"
   wait__check "second poll: prune failed" \
-    github__has_jobs_concluded "$distributor" "$run" "prune / prune" failure
-  wait__check "no state commit while failing" test "$(github__head_sha "$distributor")" = "$before"
+    github__has_jobs_concluded "${distributor}" "${run}" "prune / prune" failure
+  wait__check "no state commit while failing" test "$(github__head_sha "${distributor}")" = \
+    "${before}"
   wait__check "a Prune failing issue" test "$(distributor__issue_count "Prune failing" OPEN)" = 1
   keys__archive_secret_set "$(keys__fingerprint archive)"
-  run=$(poll__run)
+  run="$(poll__run)"
   wait__check "third poll: prune succeeded" \
-    github__has_jobs_concluded "$distributor" "$run" "prune / prune" success
+    github__has_jobs_concluded "${distributor}" "${run}" "prune / prune" success
   wait__check "the Prune failing issue closed" \
     test "$(distributor__issue_count "Prune failing" CLOSED)" = 1
-  wait__check "no package still published" state__has_none_published "$repo"
+  wait__check "no package still published" state__has_none_published "${repo}"
 }

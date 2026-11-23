@@ -2,7 +2,7 @@
 # nothing new and commits nothing.
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
+  source "${BATS_TEST_DIRNAME}/../../lib/harness.sh"
   lifecycle__reset
 }
 
@@ -34,17 +34,17 @@ not_committed_by() {
 
 @test "overlapping polls admit a release once" {
   local role=fixture repo distributor first second
-  repo=$(settings__get ".repos.$role.remote")
-  distributor=$(settings__get .repos.distributor.remote)
-  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  repo="$(settings__get ".repos.${role}.remote")"
+  distributor="$(settings__get .repos.distributor.remote)"
+  crafted__release_create "${role}" v1.0.0 "$(suite__repo_name "${repo}") 1.0.0"
   { read -r first && read -r second; } < <(poll__dispatch 2)
-  github__run_wait "$distributor" "$first" > /dev/null
-  github__run_wait "$distributor" "$second" > /dev/null
+  github__run_wait "${distributor}" "${first}" > /dev/null
+  github__run_wait "${distributor}" "${second}" > /dev/null
   wait__check "first poll admitted v1.0.0" \
-    github__has_jobs_concluded "$distributor" "$first" "admit / admit" success
+    github__has_jobs_concluded "${distributor}" "${first}" "admit / admit" success
   wait__check "second poll found nothing new" \
-    github__has_jobs_concluded "$distributor" "$second" admit skipped
-  wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published
-  wait__check "state committed by the first poll" committed_by "$first"
-  wait__check "no state commit by the second" not_committed_by "$second"
+    github__has_jobs_concluded "${distributor}" "${second}" admit skipped
+  wait__check "v1.0.0: published" test "$(state__release_status "${repo}" v1.0.0)" = published
+  wait__check "state committed by the first poll" committed_by "${first}"
+  wait__check "no state commit by the second" not_committed_by "${second}"
 }

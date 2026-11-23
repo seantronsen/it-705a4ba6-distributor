@@ -14,7 +14,7 @@ set -uo pipefail
 source "$(dirname "$0")/../lib/launch.sh"
 
 main() {
-  case ${1:-} in
+  case "${1:-}" in
     -h | --help)
       launch__usage "$0"
       return 0

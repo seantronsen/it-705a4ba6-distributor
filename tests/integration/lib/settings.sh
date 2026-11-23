@@ -2,7 +2,7 @@
 # The run's settings inside the tools container: the configuration the launcher writes, plus the
 # run's own values under .run.
 
-[[ -n ${_IT_SETTINGS_SH:-} ]] && return 0
+[[ -n "${_IT_SETTINGS_SH:-}" ]] && return 0
 _IT_SETTINGS_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"

@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Random names.
 
-[[ -n ${_IT_RANDOM_SH:-} ]] && return 0
+[[ -n "${_IT_RANDOM_SH:-}" ]] && return 0
 _IT_RANDOM_SH=1
 
 ################################################################################

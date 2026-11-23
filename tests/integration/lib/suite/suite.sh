@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Small helpers on the run's settings.
 
-[[ -n ${_IT_SUITE_SH:-} ]] && return 0
+[[ -n "${_IT_SUITE_SH:-}" ]] && return 0
 _IT_SUITE_SH=1
 
 source "$(dirname "${BASH_SOURCE[0]}")/../settings.sh"
@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../settings.sh"
 #   The name on stdout.
 ################################################################################
 suite__repo_name() {
-  local name=${1#*/}
+  local name="${1#*/}"
   echo "${name,,}"
 }
 
@@ -30,4 +30,4 @@ suite__marker() { echo .distributor-it; }
 # Returns:
 #   0 when keeping them, 1 otherwise.
 ################################################################################
-suite__is_kept() { [[ $(settings__get .keep_repos) == true ]]; }
+suite__is_kept() { [[ "$(settings__get .keep_repos)" == true ]]; }

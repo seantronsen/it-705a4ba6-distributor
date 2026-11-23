@@ -3,25 +3,25 @@
 # (then trusting the repository through it alone). Publishes once for every test.
 
 setup_file() {
-  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
+  source "${BATS_TEST_DIRNAME}/../../lib/harness.sh"
   local role=fixture repo dir
-  repo=$(settings__get ".repos.$role.remote")
-  dir=$(install_dir)
+  repo="$(settings__get ".repos.${role}.remote")"
+  dir="$(install_dir)"
   lifecycle__reset
-  crafted__release_create "$role" v1.0.0 "$(suite__repo_name "$repo") 1.0.0"
+  crafted__release_create "${role}" v1.0.0 "$(suite__repo_name "${repo}") 1.0.0"
   poll__run > /dev/null
-  wait__check "v1.0.0: published" test "$(state__release_status "$repo" v1.0.0)" = published
+  wait__check "v1.0.0: published" test "$(state__release_status "${repo}" v1.0.0)" = published
   workflow__run keyring.yml > /dev/null
   wait__check "openchami-keyring 1.0.0: published" \
     test "$(state__json | jq -r '."openchami-keyring@1.0.0".status')" = published
   # The bootstrap key, mounted at /repo/keys/archive.asc.
-  mkdir -p "$dir/keys"
-  keys__public_write "$(keys__fingerprint archive)" "$dir/keys/archive.asc"
-  s3__apt_https_write "$dir"
+  mkdir -p "${dir}/keys"
+  keys__public_write "$(keys__fingerprint archive)" "${dir}/keys/archive.asc"
+  s3__apt_https_write "${dir}"
 }
 
 setup() {
-  source "$BATS_TEST_DIRNAME/../../lib/harness.sh"
+  source "${BATS_TEST_DIRNAME}/../../lib/harness.sh"
 }
 
 teardown() {
