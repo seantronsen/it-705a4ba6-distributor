@@ -37,7 +37,6 @@ update_state() {
       <<< "$state")
   done
 
-  mkdir -p "$(dirname "$STATE")"
   jq -S . <<< "$state" > "$STATE.tmp"
   mv "$STATE.tmp" "$STATE"
   log__info "record: updated $STATE"

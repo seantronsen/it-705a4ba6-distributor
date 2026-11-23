@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The config: CONFIG (config/repos.yaml), checked against config/repos.schema.json.
+# The config: config/repos.yaml, checked against config/repos.schema.json.
 
 [[ -n ${_LIB_CONFIG_SH:-} ]] && return 0
 _LIB_CONFIG_SH=1

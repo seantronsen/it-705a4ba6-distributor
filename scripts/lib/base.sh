@@ -3,8 +3,6 @@
 # constants. Source it; don't run it.
 #
 # Environment (all optional unless a script says otherwise):
-#   CONFIG                 config file (default config/repos.yaml)
-#   STATE                  state file (default state/state.json)
 #   GITHUB_TOKEN           gh's token for the GitHub API (releases, assets, runs, issues)
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   credentials for the config's `target.s3`
 #   ARCHIVE_GPG_KEY        archive secret key, armored or base64 (required to sign)
@@ -22,10 +20,10 @@ shopt -s inherit_errexit
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-CONFIG=${CONFIG:-$ROOT/config/repos.yaml}
-STATE=${STATE:-$ROOT/state/state.json}
 # shellcheck disable=SC2034 # used by the scripts that source this
 {
+  CONFIG=$ROOT/config/repos.yaml
+  STATE=$ROOT/state/state.json
   SUITE=stable
   DEB_ARCHES=(amd64 arm64)
   # github-actions' trust-chain check, pinned by commit; Renovate updates the tag and commit.
