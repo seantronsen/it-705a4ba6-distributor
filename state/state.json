@@ -1,4 +1,31 @@
 {
+  "openchami-keyring@1.0.0": {
+    "at": "2026-11-24T03:14:38Z",
+    "packages": [
+      {
+        "arch": "noarch",
+        "filename": "openchami-keyring-1.0.0-1.noarch.rpm",
+        "format": "rpm",
+        "name": "openchami-keyring",
+        "sha256": "6f0023d0a994e41502f4718f027c5d294119fb6b70eaab086171c8ad7f9712a5",
+        "signed_with": "EAE33751302B91DD557BD026920B79C1E28E1A0B",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "all",
+        "filename": "openchami-keyring_1.0.0-1_all.deb",
+        "format": "deb",
+        "name": "openchami-keyring",
+        "sha256": "afcdb50cbfbdfbd7cd91ab590cce13d7072ea17521617a1ba8b7382557bfcc64",
+        "status": "published",
+        "version": "1.0.0"
+      }
+    ],
+    "repo_key": null,
+    "run": "https://github.com/seantronsen/it-705a4ba6-distributor/actions/runs/45318102008",
+    "status": "published"
+  },
   "seantronsen/it-705a4ba6-testbed-tools@v1.0.0": {
     "at": "2026-11-24T03:11:30Z",
     "packages": [
