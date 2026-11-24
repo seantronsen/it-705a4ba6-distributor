@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Committing keys/ (rotation step 2: archive.asc plus archive-next.asc) triggers the keyring
 # workflow, which publishes a keyring carrying both keys, signed with the current one.
 

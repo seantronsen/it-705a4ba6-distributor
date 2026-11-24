@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Commit a run's results to state: applies them onto the latest branch tip, checks the state
 # against its schema, and pushes, retrying when another push lands first. Commits nothing when
 # the state is unchanged.

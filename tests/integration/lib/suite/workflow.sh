@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The distributor's workflows besides poll (keyring, rekey): dispatching one and finding its runs.
 

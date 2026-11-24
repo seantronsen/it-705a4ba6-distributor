@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A release whose tag has no push run (the release created it) is rejected: its publisher can't
 # be checked.
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Waiting on GitHub: retry a check until it passes, without fixed sleeps.
 

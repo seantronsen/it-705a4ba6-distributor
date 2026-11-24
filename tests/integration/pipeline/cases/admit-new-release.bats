@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A new release that passes every check is admitted, and its packages are published.
 
 setup() {

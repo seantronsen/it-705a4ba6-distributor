@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # keys/archive-next.asc committed 30+ days ago opens an "Archive key switch due" issue without
 # failing the poll; removing it (the switch is done) closes the issue.
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The run's settings inside the tools container: the configuration the launcher writes, plus the
 # run's own values under .run.

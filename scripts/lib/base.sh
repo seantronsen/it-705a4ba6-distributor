@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The base every distributor script and lib/ module sources: strict mode, logging, paths, and
 # constants. Source it; don't run it.

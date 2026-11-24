@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Every suite lib, for test files to source in one line. Each lib still sources what it needs
 # itself (and has an include guard), so sourcing one lib alone keeps working.

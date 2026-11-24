@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 source-path=SCRIPTDIR
 # jq programs in single quotes
 disable=SC2016

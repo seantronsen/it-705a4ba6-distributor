@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Install nfpm, the pinned version checked against its checksum, for keyring.sh.
 #
 #   install-nfpm.sh <bin dir>

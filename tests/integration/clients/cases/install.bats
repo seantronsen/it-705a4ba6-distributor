@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Each distro's own package manager installs from the real bucket over its public HTTPS URL: a
 # release (trusting the archive key from the harness, not the bucket), and openchami-keyring
 # (then trusting the repository through it alone). Publishes once for every test.

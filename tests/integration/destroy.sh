@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Deletes the throwaway repos init.sh recorded in the state file, after you confirm their names,
 # and the service repo's images in your GHCR namespace; then deletes the state file. Repos set in
 # your config are never touched.

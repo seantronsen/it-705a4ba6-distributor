@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Runs the pipeline tests (pipeline/cases/*.bats) against the throwaway repos and the test bucket.
 #
 #   pipeline/run.sh                  every test

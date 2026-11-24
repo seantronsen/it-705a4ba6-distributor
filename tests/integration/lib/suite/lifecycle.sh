@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The suites' lifecycle on the throwaway repos: preparing them once per run, resetting them to
 # a clean baseline before every test, and cleaning them at the end of the run.

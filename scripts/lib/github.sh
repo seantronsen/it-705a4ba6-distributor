@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The GitHub API, through gh (GITHUB_TOKEN): releases, assets, a tag's push runs, and issues.
 

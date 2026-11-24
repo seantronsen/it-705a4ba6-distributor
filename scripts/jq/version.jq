@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Versions: major.minor.patch strings.
 
 # "1.2.3" -> [1, 2, 3]

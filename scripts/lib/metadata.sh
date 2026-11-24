@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Repository metadata updates for publish, prune, and rekey, without downloading old packages.
 # Needs keys__archive_load first.

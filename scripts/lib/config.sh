@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The config: config/distributor.yaml, checked against schemas/distributor.schema.json. Read
 # once, with each repo's omitted settings filled from the schema's defaults, into CONFIG_JSON

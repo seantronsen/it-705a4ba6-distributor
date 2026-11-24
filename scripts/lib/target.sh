@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The publish target: the config's `target.s3` bucket. Paths are keys relative to the bucket's
 # root (e.g. rpm/packages/<file>).

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Each distro's own package manager installing from the published repository, in a clean sibling
 # container: a package, checking signatures against the archive key from /repo/keys/archive.asc

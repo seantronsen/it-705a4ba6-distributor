@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # yaml-language-server: $schema=https://nfpm.goreleaser.com/static/schema.json
 # openchami-keyring: every public key in keys/, for dnf and apt. Built by scripts/keyring.sh,
 # which sets KEYRING_VERSION and writes keyring/build/keys.asc (all the keys, armored).

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # The config's publishers ($pubs), keyed by GitHub user ID, against a tag's push actors (input:
 # [{run, attempt, role, login, id, type}], from github__tag_push_actor_list).
 

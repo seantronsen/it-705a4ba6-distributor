@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The throwaway distributor repo: its config, edits to it, and the issues it opens. Seeding and
 # resetting it are in lifecycle.sh.

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Runs inside the tools container that pipeline/run.sh or clients/run.sh starts; never run it by hand.
 # Installs the tools, sets up GitHub access, and runs bats on one suite's tests.
 #

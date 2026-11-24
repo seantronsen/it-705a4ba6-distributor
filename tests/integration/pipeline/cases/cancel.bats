@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A poll cancelled mid-run commits nothing; the next poll admits the release normally.
 
 setup() {

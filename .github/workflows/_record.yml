@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Applies a run's results to state and files issues. Reusable; the caller holds the poll
 # concurrency group.
 name: _record

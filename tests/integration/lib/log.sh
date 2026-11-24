@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Logging for every script in the suites, on the host and in containers: timestamped lines on
 # stderr, tagged with the running test's name inside bats.

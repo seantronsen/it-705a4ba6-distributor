@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Re-sign a format's published repository with the current archive key, after a key switch.
 #
 #   rekey.sh <rpm|deb> <outdir>

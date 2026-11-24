@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # The whole pipeline with a real build: a service repo tag goes through GoReleaser and signing, and
 # the distributor admits and publishes it to the bucket. The only test that waits for a real
 # release build.

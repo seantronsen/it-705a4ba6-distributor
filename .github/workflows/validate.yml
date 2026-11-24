@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Validates config/distributor.yaml and state/state.json against their schemas on every PR, so main
 # only ever gets a valid config and state (make it a required status check). Poll validates the
 # config again before reading it, and record the state before committing it.

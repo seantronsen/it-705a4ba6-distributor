@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # ARCHIVE_GPG_KEY that isn't keys/archive.asc (a half-finished switch) fails the poll before
 # discover and the keyring build: nothing is admitted or rejected.
 

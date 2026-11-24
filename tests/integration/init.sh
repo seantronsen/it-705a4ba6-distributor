@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Creates the throwaway repos under your GitHub account and records them in the state file
 # (~/.local/state/distributor-it/repos.yaml; IT_STATE overrides), which the run scripts and
 # destroy.sh read:

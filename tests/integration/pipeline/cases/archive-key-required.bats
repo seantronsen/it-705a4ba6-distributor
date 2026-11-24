@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A poll without ARCHIVE_GPG_KEY fails at its keys job, before discover: nothing is admitted or
 # rejected, and nothing is published unsigned.
 

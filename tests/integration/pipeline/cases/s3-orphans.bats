@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Package files on the bucket that state doesn't list (orphans, here from a state reset) are
 # deleted by the next prune.
 

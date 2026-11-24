@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Two polls dispatched together run one after the other: the first admits, the second finds
 # nothing new and commits nothing.
 

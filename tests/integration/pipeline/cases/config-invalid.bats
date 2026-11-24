@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A config that fails the schema fails the poll before discover: nothing is admitted or
 # rejected, and nothing is committed. Fixing it admits normally.
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A release is published to the bucket: packages cached as immutable, metadata and keys for
 # metadata_max_age, the repository metadata signed by the archive key.
 

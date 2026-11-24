@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # When prune can't sign (an archive key under a passphrase the distributor doesn't have), polls
 # keep failing without committing and an issue stays open; once the key is fixed, prune succeeds
 # and the issue closes.

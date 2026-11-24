@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # config/distributor.yaml (input, as JSON).
 
 # Fills each repo's omitted settings with their defaults from the schema ($schema).

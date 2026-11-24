@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Report prune: opens a "Prune failing" issue when prune failed in this run and in the calling
 # workflow's previous run, and closes it once prune succeeds. A single failure only warns: the
 # next run retries it.

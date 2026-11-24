@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Runs the client tests (clients/cases/*.bats): each distro's own package manager installs from
 # the test bucket, in sibling containers.
 #

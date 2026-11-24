@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Publishes the run's admitted packages, one job per format. Reusable; the caller holds the poll
 # concurrency group and provides the <prefix>-admit-* artifacts (admit dirs: result.json and
 # files/), and gets <prefix>-delta-<format> back.

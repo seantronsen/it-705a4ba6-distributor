@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # The keyring workflow builds openchami-keyring 1.0.0 carrying the archive key and publishes it
 # like an admitted release. Exports its packages to artifacts/keyring.
 

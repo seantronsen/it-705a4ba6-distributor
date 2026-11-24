@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Logging for the distributor scripts: timestamped lines on stderr, so stdout stays the scripts'
 # output. The same format as the integration suite's lib/log.sh, without its bats parts.

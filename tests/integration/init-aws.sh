@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Creates the test bucket's AWS resources and records them for the suites and destroy-aws.sh: the
 # bucket in ~/.local/state/distributor-it/s3.json (IT_S3_STATE overrides), the access key in
 # s3-credentials.json beside it (mode 600; IT_S3_CREDENTIALS overrides):

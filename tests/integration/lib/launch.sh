@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The host side of a run, shared by pipeline/run.sh and clients/run.sh: checks the host and the
 # configuration, sets the test bucket's credentials as the distributor's secrets, snapshots the
@@ -20,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/settings.sh"
 #   The usage on stdout.
 ################################################################################
 launch__usage() {
-  sed -n '2,/^set /p' "$1" | sed '$d; s/^# \{0,1\}//'
+  sed -n '2,/^set /p' "$1" | sed '$d; /^# SPDX-/d; s/^# \{0,1\}//' | sed '1{/^$/d}'
 }
 
 ################################################################################

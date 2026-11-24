@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # Crafted releases: tiny but real rpm and deb packages, signed through the run's key chain the
 # way gpg-sign-artifacts signs a real release, published as a GitHub release in seconds.

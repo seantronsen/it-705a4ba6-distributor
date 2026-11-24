@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # One poll admits at most max_releases releases (lowered to 3 here); the rest wait for the next.
 
 setup() {

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The container engine: podman or docker on the host, or podman-remote inside the distro tools
 # container (sibling containers through the host's rootless podman socket).

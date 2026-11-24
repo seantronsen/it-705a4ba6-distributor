@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # shellcheck shell=bash
 # The suites' configuration on the host: config.defaults.yaml overridden by the user's config
 # file, plus the state files init.sh and init-aws.sh write.

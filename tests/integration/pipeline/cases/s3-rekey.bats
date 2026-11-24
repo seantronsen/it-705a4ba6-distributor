@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # After a key switch (rotation step 3), the rekey workflow re-signs every published rpm and the
 # repository metadata with the new key, records it as signed_with, and publishes its public key.
 

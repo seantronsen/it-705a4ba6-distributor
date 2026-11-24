@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Repo names: owner/repo, and release keys owner/repo@tag.
 
 # "owner/repo" -> "repo", lowercased.

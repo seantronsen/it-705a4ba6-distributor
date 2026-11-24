@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # An archive key expiring within 30 days fails every poll before discover and keeps an
 # "Archive key expiring" issue open; a fresh key passes and closes it.
 

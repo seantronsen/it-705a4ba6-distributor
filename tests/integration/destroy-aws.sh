@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Deletes the AWS resources init-aws.sh recorded in the state file, after you confirm their
 # names: the bucket with every object in it, and the IAM user (named like the bucket) with its
 # policy and access keys; then deletes the state and credentials files. Uses your AWS CLI

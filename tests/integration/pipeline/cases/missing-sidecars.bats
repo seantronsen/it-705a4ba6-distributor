@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A release without its signature sidecars is rejected once, with one issue, and not reprocessed.
 
 setup() {

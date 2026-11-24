@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # distributor (working name)
 
 Prototype of the central repo from OpenCHAMI/github-actions#43: it polls OpenCHAMI service repos

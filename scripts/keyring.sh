@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Build the openchami-keyring rpm and deb as an admit dir, so publish and record handle it like an
 # admitted release.
 #

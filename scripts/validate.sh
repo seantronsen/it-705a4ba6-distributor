@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Validate files against a JSON Schema, with the check-jsonschema pinned in
 # schemas/requirements.txt. pipx run needs nothing on PATH.
 #

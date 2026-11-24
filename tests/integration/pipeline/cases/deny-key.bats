@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Denying a repo key prunes everything it admitted, opens a denial issue, and rejects its new
 # releases.
 

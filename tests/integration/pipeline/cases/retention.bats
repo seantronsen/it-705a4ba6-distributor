@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # A newer patch release prunes the previous one's packages (keep the latest patch per minor).
 
 setup() {

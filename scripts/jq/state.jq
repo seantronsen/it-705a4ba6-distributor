@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # state/state.json (input): releases keyed by <repo>@<tag>, each with its packages.
 
 import "repo" as repo;

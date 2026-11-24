@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Admits each new release, one job per release. Reusable; called by poll.
 # Uploads a poll-admit-<n> artifact per release for publish and record.
 name: _admit

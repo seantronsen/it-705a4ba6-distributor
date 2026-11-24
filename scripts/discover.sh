@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
 # Discover: list releases not yet in state.
 # Prints a JSON matrix of {repo, tag}: the oldest new releases first, at most the config's
 # max_releases; the rest wait for the next polls.
