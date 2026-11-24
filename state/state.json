@@ -1,1 +1,29 @@
-{}
+{
+  "seantronsen/it-705a4ba6-testbed-tools@v1.0.0": {
+    "at": "2026-11-24T03:11:30Z",
+    "packages": [
+      {
+        "arch": "noarch",
+        "filename": "it-705a4ba6-testbed-tools-1.0.0-1.noarch.rpm",
+        "format": "rpm",
+        "name": "it-705a4ba6-testbed-tools",
+        "sha256": "e79babde6074bf5caa86b424a51e66af61f36255562607c7191f84cf7bb4b1ab",
+        "signed_with": "EAE33751302B91DD557BD026920B79C1E28E1A0B",
+        "status": "published",
+        "version": "1.0.0"
+      },
+      {
+        "arch": "all",
+        "filename": "it-705a4ba6-testbed-tools_1.0.0-1_all.deb",
+        "format": "deb",
+        "name": "it-705a4ba6-testbed-tools",
+        "sha256": "a6b4883f275add03009277e155a5bcb14745b1b15b4ca711ae92be56e1ed7820",
+        "status": "published",
+        "version": "1.0.0"
+      }
+    ],
+    "repo_key": "56AF9FF5349AA75376B8775458D35B264944C8F5",
+    "run": "https://github.com/seantronsen/it-705a4ba6-distributor/actions/runs/45317680289",
+    "status": "published"
+  }
+}
