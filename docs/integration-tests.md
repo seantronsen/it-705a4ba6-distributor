@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # Integration tests
 
 `tests/integration/` tests the distributor end to end with bats-core, in two suites:

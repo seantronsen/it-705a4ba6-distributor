@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # Deployment
 
 How the publish target is expected to be set up. The distributor only pushes to an S3 bucket;

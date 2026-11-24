@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # Testing the prototype in the wild
 
 A manual sanity check: get one real, signed testbed release through poll and install its

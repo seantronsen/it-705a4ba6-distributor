@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # Distributor spec: deferred
 
 Everything outside the prototype ([spec.md](spec.md)). Archive key management and the keyring
@@ -7,15 +12,19 @@ reconciling with the reworked prototype.
 
 ## Order
 
-1. Integration tests: the next round, per the review notes (Testing), including the S3 and archive
-   key cases.
-2. Unit tests: rework `seantronsen/wip/tests`, after the integration round.
-3. Revise the whole repo, workflows through scripts (not tests): the cleanup TODOs under Later.
-4. Presentation.
-5. Keepalive workflow.
-6. Trigger mechanism (cron fires only a few times a day).
-7. Tentative: stop paging releases once discover reaches ones already in state.
-8. Maybe: adopt github-actions' `Makefile.common` (mostly for test targets; little else applies).
+To finish the prototype (2026-11-23):
+
+1. Integration tests on the refactor (pipeline, then clients), reviewing the suite piecewise
+   while it runs (Later: the test naming and layout recheck).
+2. The docs.
+3. The PR stack, after a history rewrite.
+
+Then, as issues: presentation (only after others have reviewed the PR stack), keepalive
+workflow, trigger mechanism (cron fires only a few times a day), and adopting the newer
+OpenCHAMI github-actions workflows (e.g. REUSE linting; the SPDX headers are in, and `reuse lint`
+passes) once their review is done. Also later: unit tests (rework
+`seantronsen/wip/tests`); tentatively, stop paging releases once discover reaches ones already
+in state; maybe adopt github-actions' `Makefile.common` (mostly for test targets).
 
 Deferred, possibly indefinitely: state on its own branch, apk and pacman, per-distro-version
 repositories, the notifier.
@@ -137,14 +146,6 @@ Parked on `seantronsen/wip/tests`.
 [integration-tests.md](integration-tests.md) covers usage, the tests, and the code conventions.
 Remaining:
 
-- TODO: S3 in the suite, as cases: a test bucket in settings, its credentials (scoped to that
-  bucket) set as the throwaway distributor's secrets, `target.s3` in the default config, and the
-  distro tests installing from the bucket's HTTPS URL instead of the local versitygw. Cover
-  prune's deletions and orphan reconcile against the bucket too. For client checks: bare
-  `debian:13` lacks `ca-certificates`, so apt can't fetch over HTTPS until it's installed.
-- TODO: archive key cases: the `keyring` workflow and installing the keyring with dnf and apt,
-  `rekey.yml` after a key switch, and both `check-keys` issues (expiring, switch due). All
-  implemented; tested locally only.
 - Flake resilience: GitHub-side failures (e.g. actions/download-artifact giving up after its
   retries) fail a test though the distributor recovers on the next poll. Options: retry flaky
   steps in the distributor; the suite re-dispatches one poll when a poll fails in a
@@ -153,8 +154,7 @@ Remaining:
   now; explore parallelism later, within the serial-runs limit); a lower `poll_interval`;
   per-job timings from a kept run. real-build is dominated by the testbed's emulated aarch64
   validate job.
-- Small open items: `run.sh --help` via sed; config duplication across the deny tests; stage.sh
-  couples distro to ci's setup (leave for now); `die` -> `fatal` in `scripts/lib.sh`.
+- Small open item: config duplication across the deny tests.
 - TODO at real deployment: an org repo, `OpenCHAMI/distributor-sandbox`, for running the suite
   so it no longer depends on personal repos and the real distributor ships nothing test-only
   (sandbox config, test state, test secrets). It will likely work closely with the
@@ -196,47 +196,20 @@ Libs:
 
 - Overall: room for simplification, deduplication, and abstraction that favors readability;
   some small lib redesigns.
-- `crafted.sh`: the name is poor for what builds release files; discuss. `crafted__sign`
-  derives the key role from the repo name (testbed or service2); take the role (or key) as an
-  argument instead, and update the call chains.
+- `crafted.sh`: the name is poor for what builds release files; discuss.
 - `poll.sh`: `poll__run` hardwires the distributor repo. Fine while runs are serial, but state
   that in the file comment, with what would change for parallelism.
-- `distributor.sh`: `distributor__push_config` may mix concerns by also waiting for the push's
+- `distributor.sh`: `distributor__config_push` may mix concerns by also waiting for the push's
   poll; discuss.
-- TODO, after Sean approves the pilot round (renames would force full-file rereviews): hoist
-  the libs shared across suites. `ci/lib` is the shared harness in practice: s3 sources 11 of
-  its files and distro `suite.sh`; only `edit`, `issues`, `keyring` are ci-only. Move the rest
-  to a shared dir (e.g. `lib/github/`); also distro's `images`, `install`, `target` (s3's
-  install cases use them). Fold `s3__install_tools` (curl) into `container__install_tools`, so
-  the ci and s3 `setup_suite.bash` match. Share one JSON getter between `settings__get` and
-  `config__get` (and reconsider the config/settings naming). Decide whether `lib/` splits
-  host-side (config, launch, random, engine) from container-side code.
-- TODO, first after the pilot review: reshape the test config. One entry per repo role,
-  `repos.<role>: {remote, checkout, packages}`, roles renamed `distributor`, `service` (real
-  release builds; github-actions-testbed by default), `fixture` (crafted releases only). The
-  role list becomes `.repos | keys[]`; the `checkouts` block goes. Proposed, to discuss:
-  1. `config.sh` merges init.sh's `repos.yaml` (kept flat, mapped by one jq line) under the
-     user config, so `.repos` has one source instead of three.
-  2. The same merge takes `s3.json`'s bucket, region, url (never the credentials), dropping
-     `s3_run__use_state_settings`' temp config copy.
-  3. `fixture` gets no `packages`; the crafted names stay in `crafted.sh`.
-  4. `wait: {timeout, interval}`; `wait__check`'s tries and sleep stay inline.
-  5. One role-agnostic `suite__repo <role>` replaces the three role getters.
-  6. Existing `repos.yaml` files (keyed `testbed`/`service2`) get a one-line `yq` rename, no
-     fallback code.
-  7. `testbed.sh` and `testbed__*` are renamed in the hoist round.
-- TODO, next after the test config: a JSON Schema for `state/state.json`, as
-  `config/repos.schema.json` is for the config. Today its shape is only the example in `spec.md`
-  (State), and the scripts, the poll, and the tests each assume it.
-- TODO, reconsider: a JSON Schema for the test config (`config.defaults.yaml` and user
-  overrides), as `config/repos.schema.json` does for the distributor. Not yet: the settings are
-  still fluid, `lib/config.sh` already checks every setting it reads, and it would add Python and
+- TODO, reconsider: a JSON Schema for the test config (`config.defaults.yaml` and user overrides),
+  as `schemas/distributor.schema.json` does for the distributor. Not yet: the settings are still
+  fluid, `lib/config.sh` already checks every setting it reads, and it would add Python and
   `check-jsonschema` to the host requirements (today only `yq` and `jq`).
 
 New, unnecessary but wanted:
 
 - A replication mode: a `repos` option in `config.defaults.yaml` that mirrors the real
-  distributor locally, polling every eligible OpenCHAMI repo (per the real `repos.yaml`), so a
+  distributor locally, polling every eligible OpenCHAMI repo (per the real config), so a
   test can watch releases get pulled in and pruned from start to finish, then test the final
   state locally (distro side: installs, package interop, requirements). The repo may be too big
   for CI artifacts, which would need a test S3 endpoint. Pairs with the existing `keep`
@@ -274,11 +247,15 @@ the publisher check above). Then the testing-guide's presentation run as the dem
 
 ## Later
 
-- TODO, consider: drop the local directory target once S3 is proven, which simplifies every
-  `target_*` function. Blocked until the suite has an internet-reachable test bucket: its CI and
-  distro tests read the local target's artifacts.
-- TODO: trim the doc comments in `scripts/` (many are too verbose), during the cleanup.
-- TODO: build the suite's crafted packages (`ci/lib/crafted.sh`) with nfpm, as real releases do
+- TODO, consider: keep ARCHIVE_GPG_PASSPHRASE off disk. keys__archive_load writes it to
+  `$GNUPGHOME/passphrase` (shredded on exit by keys__archive_unload) because rpmsign and
+  apt-ftparchive call gpg themselves, so a per-call `--passphrase-fd` can't reach them;
+  gpg-preset-passphrase into the agent would.
+- TODO: recheck every test lib and case helper name against the standard settled on scripts/
+  (lib `<lib>__<object>[_<action>]`, the module as part of the name where it reads well,
+  `is_`/`has_` predicates, script-local helpers named for what they do and whether they end the
+  run, e.g. `reject_if_*`), piecewise, while the suites run.
+- TODO: build the suite's crafted packages (`lib/suite/crafted.sh`) with nfpm, as real releases do
   through GoReleaser (about 30 lines; pinned nfpm binary in the tools container).
 - apk and pacman. Both can update their indexes without old packages (tested): pacman natively
   with `repo-add` / `repo-remove` (`--sign`); apk by merging `APKINDEX` stanzas by hand
@@ -289,12 +266,12 @@ the publisher check above). Then the testing-guide's presentation run as the dem
 - State on its own unprotected branch, so the poller bot needs no bypass on the protected default
   branch (a bypass can't be scoped to `state/state.json`). Unverified: whether commits to that
   branch count as activity for GitHub's 60-day scheduled-workflow rule.
-- Not planned: ignoring releases published before a repo was added to `repos.yaml`. Today's
+- Not planned: ignoring releases published before a repo was added to the config. Today's
   releases of smd, bss, magellan, ochami, opaal, tokensmith, and release carry unsigned packages
   with no sidecars; the first polls reject each one (256 per poll, oldest first) and open an
   issue per release, until state covers them all. That's intended.
-- `releases_list` gets more expensive as releases accumulate (every poll lists every release);
-  see Order, item 10.
+- `github__release_list` gets more expensive as releases accumulate (every poll lists every
+  release); see Order (stop paging releases).
 
 ## Possibly never
 

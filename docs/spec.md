@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: © 2026 OpenCHAMI a Series of LF Projects, LLC
+SPDX-License-Identifier: MIT
+-->
+
 # Distributor spec (prototype)
 
 The central repo from OpenCHAMI/github-actions#43 (decision A2). It pulls signed releases from
